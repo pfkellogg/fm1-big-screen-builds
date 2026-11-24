@@ -1,0 +1,24 @@
+diff --git a/app/fm1.toml b/app/fm1.toml
+index d5b775a..2f7ba47 100644
+--- a/app/fm1.toml
++++ b/app/fm1.toml
+@@ -1,5 +1,6 @@
+ # FMLarynx's build settings (fm1-base's tools/build.py, through ./build.sh)
+ name = "FMLARYNX"              # APP_NAME is in app.h; this names the build's files: fmlarynx.fwsc, fmlarynx-X.Y.fwsc
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ title = "FMLarynx"             # the name people know it by, for firmware.json (the USB name stays FMLARYNX)
+ id_prefix = "FM-1_984"         # package identity: dev FM-1_98400, releases FM-1_984XXYYZZ. The hub lists FMLarynx
+                                # as FM-1_984: agree the wider pattern with the hub before releasing
+diff --git a/firmware.json b/firmware.json
+index d274567..b4d8c8e 100644
+--- a/firmware.json
++++ b/firmware.json
+@@ -14,7 +14,7 @@
+   "hardware": {
+     "models": ["FM-1"],
+     "flash": ["856014", "B36014"],
+-    "features": ["bluetooth-midi", "bluetooth-midi-devices", "usb-audio-in", "usb-audio-out", "usb-midi-host", "screen-reader"]
++    "features": ["bluetooth-midi", "bluetooth-midi-devices", "usb-audio-in", "usb-audio-out", "usb-midi-host", "screen-reader", "screen-mirror"]
+   },
+   "credits": "Built on fm1-base and felucca-bsp, from Felucca by Leo Kuroshita (Hügelton Instruments)."
+ }

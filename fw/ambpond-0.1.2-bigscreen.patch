@@ -1,0 +1,56 @@
+diff --git a/app/app.h b/app/app.h
+index 21fd8c8..ced850c 100644
+--- a/app/app.h
++++ b/app/app.h
+@@ -1,3 +1,11 @@
++/* FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's mirror turned on (fm1.toml mirror = true), its
++ * buffers smaller so it fits: the send ring and the row segments (device/mirror.c) */
++#ifndef MRQ
++#define MRQ 1536u
++#endif
++#ifndef MR_SEGW
++#define MR_SEGW 240u
++#endif
+ /* SPDX-License-Identifier: MPL-2.0
+  * Copyright (C) 2026 Charles Vestal */
+ /* POND app: the project (everything that is saved), the app's entry points and its half of the contract with
+diff --git a/app/fm1.toml b/app/fm1.toml
+index 4d03af8..4afc83b 100644
+--- a/app/fm1.toml
++++ b/app/fm1.toml
+@@ -1,5 +1,6 @@
+ # POND's build settings (fm1-base's tools/build.py: ./build.sh). Derived from AMB-1.
+ name = "POND"                  # the build's files: pond.fwsc, pond-X.Y.fwsc
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ id_prefix = "FM-1_8008"        # package identity, for a dev build and a release
+ usb_manufacturer = "POND"
+ usb_product = "POND FM-1"
+diff --git a/firmware.json b/firmware.json
+index 41d2405..6f91224 100644
+--- a/firmware.json
++++ b/firmware.json
+@@ -2,17 +2,19 @@
+   "schema": 1,
+   "id": "pond",
+   "name": "POND",
+-  "author": "Charles Vestal",
++  "author": "superxor",
+   "license": "MPL-2.0",
+   "tagline": "A generative garden pond for the FM-1",
+-  "description": "POND turns the M-VAVE FM-1 into a generative garden pond, derived from AMB-1. It plays itself from the moment it is switched on: breathing voices, water drops on loops of unequal length, a gliding bass and quiet drips, through a tape echo and a plate reverb. It has eight pieces. You don't perform it, you tend it: pick a piece and a scale, take notes out, put them back, and let the pond grow.",
++  "description": "POND turns the M-VAVE FM-1 into a generative garden pond, derived from AMB-1. It plays itself from the moment it is switched on: breathing voices, water drops on loops of unequal length, a gliding bass and quiet drips, through a tape echo and a plate reverb. Nine pieces, from a quiet pond to rain and thunder. You don't perform it, you tend it: pick a piece and a scale, take notes out, put them back, and let the pond grow.",
+   "tags": ["ambient", "generative", "fm"],
+-  "source": "https://github.com/charlesvestal/fm1-amb",
+-  "screenshot": "docs/img/screen-garden.png",
++  "install": "https://github.com/superxor/amb-pond/releases",
++  "site": "https://github.com/superxor/amb-pond",
++  "source": "https://github.com/superxor/amb-pond",
++  "screenshot": "docs/card.png",
+   "hardware": {
+     "models": ["FM-1"],
+     "flash": ["856014", "B36014"],
+-    "features": ["usb-audio-in", "screen-reader"]
++    "features": ["usb-audio-in", "screen-reader", "screen-mirror"]
+   },
+   "credits": "Derived from AMB-1 by Charles Vestal. Built on fm1-base and felucca-bsp, from Felucca by Leo Kuroshita (Hügelton Instruments)."
+ }

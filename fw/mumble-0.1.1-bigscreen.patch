@@ -1,0 +1,24 @@
+diff --git a/app/fm1.toml b/app/fm1.toml
+index 2ca6dbc..2269d53 100644
+--- a/app/fm1.toml
++++ b/app/fm1.toml
+@@ -1,5 +1,6 @@
+ # MUMBLE's build settings (fm1-base tools/build.py)
+ name = "MUMBLE"                # APP_NAME is in app.h; this names the build's files
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ id_prefix = "FM-1_68"          # package identity: dev FM-1_6800, releases FM-1_68XXYYZZ
+ usb_manufacturer = "MUMBLE"
+ usb_product = "MUMBLE FM-1"
+diff --git a/firmware.json b/firmware.json
+index 5d8c485..9e9cbbe 100644
+--- a/firmware.json
++++ b/firmware.json
+@@ -14,7 +14,7 @@
+   "hardware": {
+     "models": ["FM-1"],
+     "flash": ["856014", "B36014"],
+-    "features": ["usb-audio-in", "usb-audio-out", "screen-reader"]
++    "features": ["usb-audio-in", "usb-audio-out", "screen-reader", "screen-mirror"]
+   },
+   "credits": "Built on fm1-base and felucca-bsp, from Felucca by Leo Kuroshita (Hügelton Instruments)."
+ }

@@ -1,0 +1,24 @@
+diff --git a/app/fm1.toml b/app/fm1.toml
+index d9f7554..351cd72 100644
+--- a/app/fm1.toml
++++ b/app/fm1.toml
+@@ -1,5 +1,6 @@
+ # A22's build settings for fm1-base's tools/build.py (../build.sh runs it; the keys are explained at its top)
+ name = "a22"                   # names the build's files: app/build/a22.fwsc, a22-X.Y.Z.fwsc
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ id_prefix = "FM-1_4122"        # A22's own package identity: dev builds FM-1_412200, releases FM-1_4122XXYYZZ
+ usb_manufacturer = "A22"
+ usb_product = "A22 FM-1"
+diff --git a/firmware.json b/firmware.json
+index 786c960..aeeea9b 100644
+--- a/firmware.json
++++ b/firmware.json
+@@ -13,7 +13,7 @@
+   "hardware": {
+     "models": ["FM-1"],
+     "flash": ["856014", "B36014"],
+-    "features": ["usb-audio-in", "usb-midi-host", "second-core", "screen-reader"]
++    "features": ["usb-audio-in", "usb-midi-host", "second-core", "screen-reader", "screen-mirror"]
+   },
+   "credits": "A22 is derived from h1 by Jake Handy, built on fm1-base by Charles Vestal and felucca-bsp from Felucca by Leo Kuroshita, Hügelton Instruments."
+ }

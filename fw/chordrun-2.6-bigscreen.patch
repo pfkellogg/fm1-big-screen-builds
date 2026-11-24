@@ -1,0 +1,11 @@
+diff --git a/fm1.toml b/fm1.toml
+index b4bc862..86f0746 100644
+--- a/fm1.toml
++++ b/fm1.toml
+@@ -1,5 +1,6 @@
+ # CHORD RUN build settings (fm1-base tools/build.py)
+ name = "chordrun"               # the build's file names: chordrun-1.5.fwsc, build/host/chordrun_host
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ title = "CHORD RUN"             # the name people see (firmware hubs)
+ id_prefix = "FM-1_571"          # package identity: dev FM-1_57100, releases FM-1_571 + XXYYZZ (not Blop's 94)
+ usb_manufacturer = "swtdr34mz"

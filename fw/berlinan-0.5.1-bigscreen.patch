@@ -1,0 +1,11 @@
+diff --git a/app/fm1.toml b/app/fm1.toml
+index b084867..aaba4a8 100644
+--- a/app/fm1.toml
++++ b/app/fm1.toml
+@@ -1,5 +1,6 @@
+ # Berlinan's build settings (fm1-base's tools/build.py: ./build.sh)
+ name = "BERLINAN"              # the build's files: berlinan.fwsc, berlinan-X.Y.fwsc
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ id_prefix = "FM-1_23"          # package identity: dev FM-1_2300, releases FM-1_23XXYYZZ (its own on thefirmwarehub.com)
+ usb_manufacturer = "Berlinan"
+ usb_product = "FM-Berlinan"

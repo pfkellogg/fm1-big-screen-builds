@@ -1,0 +1,24 @@
+diff --git a/app/fm1.toml b/app/fm1.toml
+index a9e67c7..657176e 100644
+--- a/app/fm1.toml
++++ b/app/fm1.toml
+@@ -1,5 +1,6 @@
+ # ZENITH-1's build settings (fm1-base's tools/build.py: ./build.sh)
+ name = "ZENITH"                # the build's files: zenith.fwsc, zenith-X.Y.fwsc
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ id_prefix = "FM-1_97"          # package identity: dev FM-1_9700, releases FM-1_97XXYYZZ
+ usb_manufacturer = "ZENITH-1"
+ usb_product = "ZENITH-1 FM-1"
+diff --git a/firmware.json b/firmware.json
+index 0ceda6d..5ee9777 100644
+--- a/firmware.json
++++ b/firmware.json
+@@ -13,7 +13,7 @@
+   "hardware": {
+     "models": ["FM-1"],
+     "flash": ["856014", "B36014"],
+-    "features": ["usb-audio-in", "screen-reader"]
++    "features": ["usb-audio-in", "screen-reader", "screen-mirror"]
+   },
+   "credits": "Built on AMB-1 by Charles Vestal, its engine, controls and structure; the picture from HADAL-1's; on fm1-base and felucca-bsp, from Felucca by Leo Kuroshita (Hugelton Instruments)."
+ }

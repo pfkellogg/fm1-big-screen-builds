@@ -1,0 +1,11 @@
+diff --git a/app/fm1.toml b/app/fm1.toml
+index 6d28f49..b974524 100644
+--- a/app/fm1.toml
++++ b/app/fm1.toml
+@@ -1,5 +1,6 @@
+ # FM-1_DelRio's build settings (fm1-base's tools/build.py: ./build.sh)
+ name = "DelRio"                # APP_NAME is in app.h; this names the build's files: delrio.fwsc
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ id_prefix = "FM-1_48"          # package identity (each firmware its own): dev FM-1_4800, releases FM-1_48XXYYZZ
+ usb_manufacturer = "Jess Del Rio"
+ usb_product = "FM-1 DelRio"

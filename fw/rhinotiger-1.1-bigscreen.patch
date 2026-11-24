@@ -1,0 +1,40 @@
+diff --git a/app/app.h b/app/app.h
+index bdeb0f2..68b2ed5 100644
+--- a/app/app.h
++++ b/app/app.h
+@@ -1,3 +1,11 @@
++/* FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's mirror turned on (fm1.toml mirror = true), its
++ * buffers smaller so it fits: the send ring and the row segments (device/mirror.c) */
++#ifndef MRQ
++#define MRQ 1536u
++#endif
++#ifndef MR_SEGW
++#define MR_SEGW 240u
++#endif
+ /* SPDX-License-Identifier: GPL-3.0-only
+  * Copyright (C) 2026 hacha */
+ /* RhinoTiger: the app's half of the contract with fm1-base (device/unity.c, host/plat_host.c). Its shape follows
+diff --git a/app/fm1.toml b/app/fm1.toml
+index 1e9cd14..b7710de 100644
+--- a/app/fm1.toml
++++ b/app/fm1.toml
+@@ -1,5 +1,6 @@
+ # RhinoTiger's build settings (fm1-base's tools/build.py: ./build.sh)
+ name = "RHINOTIGER"            # the build's files: rhinotiger.fwsc, rhinotiger-X.Y.fwsc
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ id_prefix = "FM-1_1613"        # package identity (each firmware its own): dev FM-1_161300, releases FM-1_1613XXYYZZ
+ usb_manufacturer = "RhinoTiger"
+ usb_product = "RhinoTiger FM-1"
+diff --git a/firmware.json b/firmware.json
+index 41c98c9..ac89086 100644
+--- a/firmware.json
++++ b/firmware.json
+@@ -14,7 +14,7 @@
+   "hardware": {
+     "models": ["FM-1"],
+     "flash": ["856014", "B36014"],
+-    "features": ["usb-audio-in", "velocity", "pressure", "screen-reader"]
++    "features": ["usb-audio-in", "velocity", "pressure", "screen-reader", "screen-mirror"]
+   },
+   "credits": "Built on fm1-base and felucca-bsp, from Felucca by Leo Kuroshita (Hügelton Instruments). Started from fm1-base's template by Charles Vestal."
+ }

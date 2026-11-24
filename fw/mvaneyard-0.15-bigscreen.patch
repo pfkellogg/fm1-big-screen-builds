@@ -1,0 +1,40 @@
+diff --git a/app/app.h b/app/app.h
+index 22aa173..4401834 100644
+--- a/app/app.h
++++ b/app/app.h
+@@ -1,3 +1,11 @@
++/* FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's mirror turned on (fm1.toml mirror = true), its
++ * buffers smaller so it fits: the send ring and the row segments (device/mirror.c) */
++#ifndef MRQ
++#define MRQ 2048u
++#endif
++#ifndef MR_SEGW
++#define MR_SEGW 60u
++#endif
+ /* SPDX-License-Identifier: GPL-3.0-only */
+ /* mvane yard: the app's half of the contract with fm1-base (base/device/unity.c, base/host/plat_host.c). */
+ #pragma once
+diff --git a/app/fm1.toml b/app/fm1.toml
+index 1b7dcd8..f73476b 100644
+--- a/app/fm1.toml
++++ b/app/fm1.toml
+@@ -1,5 +1,6 @@
+ # mvane yard: custom FM-1 firmware (tools: base/tools/build.py app)
+ name = "MVANE-YARD"
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ id_prefix = "FM-1_53"          # package identity: dev FM-1_5300, releases FM-1_53XXYYZZ (the hub's check, 2026-11-22:
+                                # free from 0.00 to 9.99; FM-1_17, fm1-base's template's, is inside LOOM-8's range)
+ usb_manufacturer = "mvane yard"
+diff --git a/firmware.json b/firmware.json
+index 7e52cdd..5a2b54b 100644
+--- a/firmware.json
++++ b/firmware.json
+@@ -14,7 +14,7 @@
+   "hardware": {
+     "models": ["FM-1"],
+     "flash": ["856014", "B36014"],
+-    "features": ["usb-audio-in", "usb-audio-out", "usb-midi-host", "second-core", "velocity", "pressure", "screen-reader", "companion"]
++    "features": ["usb-audio-in", "usb-audio-out", "usb-midi-host", "second-core", "velocity", "pressure", "screen-reader", "screen-mirror", "companion"]
+   },
+   "credits": "Built on fm1-base (MPL-2.0) and felucca-bsp; the chord mode after Coral Flower's design (FicusFicusov); Clipper's synth vendored (GPL-3.0, by 3dSam and contributors, after SLOOP and Felucca by Leo Kuroshita)."
+ }

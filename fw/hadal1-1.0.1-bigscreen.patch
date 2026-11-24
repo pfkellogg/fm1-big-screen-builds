@@ -1,0 +1,11 @@
+diff --git a/app/fm1.toml b/app/fm1.toml
+index 03b27af..13f6361 100644
+--- a/app/fm1.toml
++++ b/app/fm1.toml
+@@ -1,5 +1,6 @@
+ # HADAL-1's build settings (fm1-base's tools/build.py: ./build.sh)
+ name = "HADAL"
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ id_prefix = "FM-1_96"           # package identity: dev FM-1_9600, releases FM-1_96XXYYZZ
+ usb_manufacturer = "HADAL-1"
+ usb_product = "HADAL-1 FM-1"

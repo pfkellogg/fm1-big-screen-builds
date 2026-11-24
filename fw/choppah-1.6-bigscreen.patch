@@ -1,0 +1,24 @@
+diff --git a/app/fm1.toml b/app/fm1.toml
+index d78cb86..76493ef 100644
+--- a/app/fm1.toml
++++ b/app/fm1.toml
+@@ -1,5 +1,6 @@
+ # CHOPPAH's build settings (fm1-base's tools/build.py: ./build.sh)
+ name = "CHOPPAH"               # the build's files: choppah.fwsc, choppah-X.Y.fwsc
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ id_prefix = "FM-1_86"          # package identity: dev FM-1_8600, releases FM-1_86XXYYZZ (PRD Q5: check it is free)
+ usb_manufacturer = "CHOPPAH"
+ usb_product = "CHOPPAH FM-1"
+diff --git a/firmware.json b/firmware.json
+index d5552f2..af8b1ac 100644
+--- a/firmware.json
++++ b/firmware.json
+@@ -14,7 +14,7 @@
+   "hardware": {
+     "models": ["FM-1"],
+     "flash": ["856014", "B36014"],
+-    "features": ["bluetooth-midi", "usb-audio-in", "screen-reader"]
++    "features": ["bluetooth-midi", "usb-audio-in", "screen-reader", "screen-mirror"]
+   },
+   "credits": "Built on fm1-base and felucca-bsp, from Felucca by Leo Kuroshita (Hügelton Instruments)."
+ }

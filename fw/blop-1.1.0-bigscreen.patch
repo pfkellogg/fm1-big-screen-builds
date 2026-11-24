@@ -1,0 +1,11 @@
+diff --git a/fm1.toml b/fm1.toml
+index 527558b..6991695 100644
+--- a/fm1.toml
++++ b/fm1.toml
+@@ -1,5 +1,6 @@
+ # BLOP build settings (fm1-base tools/build.py)
+ name = "BLOP"
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ id_prefix = "FM-1_94"           # package identity: dev FM-1_9400 (check it is free before a public release)
+ usb_manufacturer = "OSR Records"
+ usb_product = "Blop FM-1"

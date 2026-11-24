@@ -1,0 +1,40 @@
+diff --git a/app/app.h b/app/app.h
+index 3589b7c..edcfc11 100644
+--- a/app/app.h
++++ b/app/app.h
+@@ -1,3 +1,11 @@
++/* FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's mirror turned on (fm1.toml mirror = true), its
++ * buffers smaller so it fits: the send ring and the row segments (device/mirror.c) */
++#ifndef MRQ
++#define MRQ 1536u
++#endif
++#ifndef MR_SEGW
++#define MR_SEGW 240u
++#endif
+ /* SPDX-License-Identifier: GPL-3.0-only
+  * Copyright (C) 2026 hacha */
+ /* PaperLagoon: the app's half of the contract with fm1-base (device/unity.c, host/plat_host.c). Its shape follows
+diff --git a/app/fm1.toml b/app/fm1.toml
+index 3ae3874..72d37f4 100644
+--- a/app/fm1.toml
++++ b/app/fm1.toml
+@@ -1,5 +1,6 @@
+ # PaperLagoon's build settings (fm1-base's tools/build.py: ./build.sh)
+ name = "PAPERLAGOON"           # the build's files: paperlagoon.fwsc, paperlagoon-X.Y.fwsc
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ id_prefix = "FM-1_1612"        # package identity (each firmware its own): dev FM-1_161200, releases FM-1_1612XXYYZZ
+ usb_manufacturer = "PaperLagoon"
+ usb_product = "PaperLagoon FM-1"
+diff --git a/firmware.json b/firmware.json
+index 393b2f7..1cf8825 100644
+--- a/firmware.json
++++ b/firmware.json
+@@ -14,7 +14,7 @@
+   "hardware": {
+     "models": ["FM-1"],
+     "flash": ["856014", "B36014"],
+-    "features": ["usb-audio-in", "screen-reader"]
++    "features": ["usb-audio-in", "screen-reader", "screen-mirror"]
+   },
+   "credits": "Built on fm1-base and felucca-bsp, from Felucca by Leo Kuroshita (Hügelton Instruments). Started from fm1-base's template by Charles Vestal; the voices' core, the plate and the tape echo come from his AMB-1 (MPL-2.0)."
+ }

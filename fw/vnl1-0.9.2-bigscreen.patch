@@ -1,0 +1,11 @@
+diff --git a/app/fm1.toml b/app/fm1.toml
+index 0cd118d..aca0e49 100644
+--- a/app/fm1.toml
++++ b/app/fm1.toml
+@@ -1,5 +1,6 @@
+ # VNL-1's build settings (fm1-base's tools/build.py: ./build.sh)
+ name = "VNL-1"                  # the name people see; the build's files: vnl-1.fwsc, vnl-1-X.Y.fwsc, vnl-1_host
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ id_prefix = "FM-1_22"          # dev FM-1_2200, releases FM-1_22XXYYZZ (taken: 0 default, 6 CTL-1, 7 AMB-1, 8 dub, 11 template, 13 Radio)
+ usb_manufacturer = "VNL-1"
+ usb_product = "VNL-1 FM-1"

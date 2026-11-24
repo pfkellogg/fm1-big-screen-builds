@@ -1,0 +1,12 @@
+diff --git a/fm1.toml b/fm1.toml
+index 974b124..6b9c394 100644
+--- a/fm1.toml
++++ b/fm1.toml
+@@ -1,6 +1,7 @@
+ # COLLAPSE build settings (fm1-base tools/build.py). The pixel type of the screens: X0X_FONTSET=terminus in the
+ # environment (the workflow sets it; for a local build: X0X_FONTSET=terminus python3 fm1-base/tools/build.py . --host)
+ name = "collapse"                 # the build's file names: collapse-0.1.fwsc, build/host/collapse_host
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ title = "COLLAPSE"                # the name people see (firmware hubs)
+ id_prefix = "FM-1_579"            # package identity: dev FM-1_57900, releases FM-1_579 + XXYYZZ
+ usb_manufacturer = "swtdr34mz"

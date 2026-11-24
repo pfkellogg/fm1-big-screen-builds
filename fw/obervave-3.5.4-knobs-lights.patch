@@ -1,0 +1,221 @@
+diff --git a/firmware/hal/fm1_input.h b/firmware/hal/fm1_input.h
+index 6ae274b..f2e0545 100644
+--- a/firmware/hal/fm1_input.h
++++ b/firmware/hal/fm1_input.h
+@@ -213,7 +213,11 @@ static void fm1__key(uint32_t id, uint32_t closed)
+ 
+ static void fm1__keys(uint32_t p)                  /* the keys of column p, just read */
+ {
+-    uint32_t r, raw = fm1_in.raw[p];
++    uint32_t r, raw = fm1_in.raw[p]
++#ifdef FM1BS_HELD
++        | fm1bs_held_raw[p]   /* FM-1 Big Screen: the app's presses (fm1bs_panel.c) */
++#endif
++        ;
+     for (r = 1; r < 5u; r++)
+         if (FM1_KEYMAP[r][p] >= 0)
+             fm1__key((uint32_t)FM1_KEYMAP[r][p], (raw >> r) & 1u);
+diff --git a/firmware/src/obervave.c b/firmware/src/obervave.c
+index 414fd3a..7e4d038 100644
+--- a/firmware/src/obervave.c
++++ b/firmware/src/obervave.c
+@@ -16,12 +16,30 @@
+  * Integers only (no FPU, no 64-bit division); tests/host.c runs this on a computer. */
+ static void app_idle(void);
+ #define LCD_IDLE() app_idle()                   /* (lcd.c: while the DMA runs) */
++/* FM-1 Big Screen: Big Knobs, Key Lights and the remote presses added (unofficial build, aikellogg.com) */
++#include <stdint.h>
++#ifndef FM1BS_PANEL
++#define FM1BS_PANEL 1
++#endif
++#if FM1BS_PANEL
++#define FM1BS_GLOW(c) (fm1_led_dim[c])
++#define FM1BS_HELD 1
++static volatile uint8_t fm1bs_held_raw[16];   /* the app's presses, per column (fm1bs_panel.c) */
++#endif
+ #include <stdint.h>
+ static void midi_rt(uint32_t st);
+ #define MIDI_RT_HOOK(st) midi_rt(st)            /* (usb.c, midi_uart.c: clock and transport as they arrive) */
+ #define LCD_MIRROR 1                            /* (lcd.c: what is painted also goes to FM-1 Mirror – obv_mirror.h) */
+ #include "platform.c"
++#if FM1BS_PANEL
++static int fm1bs_panel_sysex(const uint8_t *m, unsigned n);   /* fm1bs_panel.c */
++static void fm1bs_panel_service(void);
++#endif
+ #include "obv_mirror.h"
++#if FM1BS_PANEL
++#define FM1BS_SEND mr_send
++#include "fm1bs_panel.c"        /* FM-1 Big Screen: Big Knobs, Key Lights, the remote presses (MIT) */
++#endif
+ #include "obv_dsp.h"
+ #include "obv_params.h"
+ #include "obv_fx.h"
+diff --git a/firmware/src/obv_mirror.h b/firmware/src/obv_mirror.h
+index 8636074..e559414 100644
+--- a/firmware/src/obv_mirror.h
++++ b/firmware/src/obv_mirror.h
+@@ -65,6 +65,14 @@ static int mirror_poll(void)
+ {
+     const uint8_t *p;
+     uint32_t n;
++#if FM1BS_PANEL
++    if (ota_frame_get(&p, &n) && n == 6u && p[0] == 0x7Du && p[1] == 'F' && p[2] == 'S' &&
++        (p[3] == 4u || p[3] == 6u || p[3] == 7u)) {        /* FM-1 Big Screen: a knob, MASTER, a press (fm1bs_panel.c) */
++        const uint8_t m8[8] = {0xF0, 0x7D, 'F', 'S', p[3], p[4], p[5], 0xF7};
++        ota_frame_done();
++        fm1bs_panel_sysex(m8, 8);
++    }
++#endif
+     if (ota_frame_get(&p, &n)) {
+         if (n == 4u && p[0] == 0x7Du && p[1] == 'F' && p[2] == 'S' && p[3] <= 1u) {
+             const uint8_t m[6] = {0xF0, 0x7D, 'F', 'S', p[3], 0xF7};
+@@ -72,6 +80,9 @@ static int mirror_poll(void)
+             sm_sysex(m, 6);
+         }
+     }
++#if FM1BS_PANEL
++    fm1bs_panel_service();                   /* FM-1 Big Screen: knobs in, lights out */
++#endif
+     sm_poll(fm1_ms, mr_send);
+     if (sm_take_full_request() || (mr_lost && sm_on())) {
+         mr_lost = 0;
+diff --git a/firmware/src/fm1bs_panel.c b/firmware/src/fm1bs_panel.c
+new file mode 100644
+index 0000000..cb1b06a
+--- /dev/null
++++ b/firmware/src/fm1bs_panel.c
+@@ -0,0 +1,134 @@
++/* SPDX-License-Identifier: MIT
++ * Copyright (c) 2026 Patrick F. Kellogg
++ *
++ * FM-1 Big Screen's panel: Big Knobs, Key Lights and the remote presses, beside the screen mirror (screen_mirror.c),
++ * by aikellogg.com/#/make-big-screen. It needs from the firmware: fm1_ms, fm1_in / fm1__lock / FM1_NENC (the knobs),
++ * fm1_led / FM1_KEYMAP / FM1_NCOL (the lights), FM1BS_SEND(m, n) (one SysEx message out, 0 = sent, never waiting),
++ * FM1BS_LISTENING (an app is asking), and, for the presses, fm1bs_held_raw[] ORed into the key scan (fm1__keys).
++ *
++ * Big Knobs (host -> FM-1): F0 7D 'F' 'S' 04 e n F7 turns encoder e (0 SELECT, 1 ALGORITHM, 2..5 KNOB 1..4, 6 PRESETS)
++ *   n clicks (7-bit signed), as if turned by hand; F0 7D 'F' 'S' 06 lo hi F7 sets MASTER (0..1023) until the real knob moves.
++ * Remote panel (host -> FM-1): F0 7D 'F' 'S' 07 id down F7 presses or lets go of button or key id (FM1_KEYMAP's ids),
++ *   into the scan before its debounce; everything let go when the app stops asking.
++ * Key Lights (FM-1 -> host): F0 7D 'F' 'S' 05 k0 k1 k2 k3 b0 b1 [g0 g1 g2 g3 h0 h1] F7: the lit keys and buttons,
++ *   then the glowing ones (FM1BS_GLOW), when they change (at most every 20 ms) and once a second.
++ */
++#ifndef FM1BS_LISTENING
++#define FM1BS_LISTENING sm_on()
++#endif
++#ifndef FM1BS_MASTER
++#define FM1BS_MASTER 0
++#endif
++
++/* ---- Big Knobs: clicks from the app, added to the encoders' own count in the main loop (as the scan would) */
++static volatile int8_t fm1bs_turns[8];
++/* 1 when it was a Big Knobs / remote press message (taken); 0 for anything else */
++static int fm1bs_panel_sysex(const uint8_t *m, unsigned n)
++{
++    if (n == 8u && m[4] == 4u && m[7] == 0xF7u) {
++        int32_t d = m[6] & 127u;
++        if (d >= 64)
++            d -= 128;
++        if (m[5] < 8u)
++            fm1bs_turns[m[5]] = (int8_t)(fm1bs_turns[m[5]] + d);
++        return 1;
++    }
++#if FM1BS_MASTER
++    if (n == 8u && m[4] == 6u && m[7] == 0xF7u) {
++        fm1bs_master = (int32_t)(m[5] & 127u) | (int32_t)(m[6] & 127u) << 7;
++        if (fm1bs_master > 1023)
++            fm1bs_master = 1023;
++        fm1bs_master_pot = -1;                       /* the real knob's place now: moving it takes over again */
++        return 1;
++    }
++#endif
++#ifdef FM1BS_HELD
++    if (n == 8u && m[4] == 7u && m[7] == 0xF7u) {
++        uint32_t c, r;
++        for (c = 0; c < FM1_NCOL; c++)
++            for (r = 1; r < 5u; r++)
++                if (m[5] < 41u && FM1_KEYMAP[r][c] == (int8_t)m[5]) {
++                    if (m[6])
++                        fm1bs_held_raw[c] = (uint8_t)(fm1bs_held_raw[c] | 1u << r);
++                    else
++                        fm1bs_held_raw[c] = (uint8_t)(fm1bs_held_raw[c] & ~(1u << r));
++                }
++        return 1;
++    }
++#endif
++    return 0;
++}
++
++static void fm1bs_knobs(void)
++{
++#ifdef FM1_NENC
++    uint32_t e;
++    for (e = 0; e < FM1_NENC && e < 8u; e++)
++        if (fm1bs_turns[e]) {
++            uint32_t k = fm1__lock();
++            int32_t d = fm1bs_turns[e];
++            fm1bs_turns[e] = 0;
++            fm1_in.enc_steps[e] = (int16_t)(fm1_in.enc_steps[e] + d);
++            fm1__unlock(k);
++        }
++#endif
++}
++
++/* ---- Key Lights: the lit LEDs to the app (fm1_led: a packed row byte per column; FM1_KEYMAP: ids) */
++static void fm1bs_lights(void)
++{
++#if defined(FM1_NCOL) && defined(FM1_NKEY)
++    static uint32_t sent_at, last_k = 0xFFFFFFFFu, last_b = 0xFFFFFFFFu, last_gk, last_gb;
++    uint32_t c, r, keys = 0, btns = 0, gk = 0, gb = 0, n = 12u;
++    uint8_t m[18];
++    if (!FM1BS_LISTENING || fm1_ms - sent_at < 20u)
++        return;
++    for (c = 0; c < FM1_NCOL; c++)
++        for (r = 1; r < 5u; r++) {
++            int32_t id = FM1_KEYMAP[r][c];
++            uint32_t lit = (fm1_led[c] >> r) & 1u, glow = 0;
++#ifdef FM1BS_GLOW
++            glow = !lit && ((FM1BS_GLOW(c)) >> r & 1u);
++#endif
++            if (id < 0 || !(lit | glow))
++                continue;
++            if (id < 14) {
++                if (lit) btns |= 1u << id; else gb |= 1u << id;
++            } else if (id < 41) {
++                if (lit) keys |= 1u << (id - 14); else gk |= 1u << (id - 14);
++            }
++        }
++    if (keys == last_k && btns == last_b && gk == last_gk && gb == last_gb && fm1_ms - sent_at < 1000u)
++        return;
++    m[0] = 0xF0; m[1] = 0x7D; m[2] = 'F'; m[3] = 'S'; m[4] = 5;
++    m[5] = keys & 127u; m[6] = keys >> 7 & 127u; m[7] = keys >> 14 & 127u; m[8] = keys >> 21 & 127u;
++    m[9] = btns & 127u; m[10] = btns >> 7 & 127u; m[11] = 0xF7;
++#ifdef FM1BS_GLOW
++    m[11] = gk & 127u; m[12] = gk >> 7 & 127u; m[13] = gk >> 14 & 127u; m[14] = gk >> 21 & 127u;
++    m[15] = gb & 127u; m[16] = gb >> 7 & 127u; m[17] = 0xF7;
++    n = 18u;
++#endif
++    if (FM1BS_SEND(m, n) == 0) {
++        last_k = keys;
++        last_b = btns;
++        last_gk = gk;
++        last_gb = gb;
++        sent_at = fm1_ms;
++    }
++#endif
++}
++
++
++/* every main-loop pass: the knobs' clicks in, the lights out, the presses let go when the app has gone */
++static void fm1bs_panel_service(void)
++{
++    fm1bs_knobs();
++    fm1bs_lights();
++#ifdef FM1BS_HELD
++    if (!sm_on()) {
++        uint32_t c;
++        for (c = 0; c < FM1_NCOL; c++)
++            fm1bs_held_raw[c] = 0;
++    }
++#endif
++}

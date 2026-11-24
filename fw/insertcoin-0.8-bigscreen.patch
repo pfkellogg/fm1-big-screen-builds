@@ -1,0 +1,12 @@
+diff --git a/fm1.toml b/fm1.toml
+index 08ff627..d1a33b6 100644
+--- a/fm1.toml
++++ b/fm1.toml
+@@ -1,6 +1,7 @@
+ # INSERT COIN build settings (fm1-base tools/build.py). The pixel type of the screens: X0X_FONTSET=terminus in the
+ # environment (the workflow sets it; for a local build: X0X_FONTSET=terminus python3 fm1-base/tools/build.py . --host)
+ name = "insertcoin"               # the build's file names: insertcoin-0.1.fwsc, build/host/insertcoin_host
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ title = "INSERT COIN"             # the name people see (firmware hubs)
+ id_prefix = "FM-1_573"          # package identity: dev FM-1_57300, releases FM-1_573 + XXYYZZ (CHORD RUN 571, GRAIN PIANO 572)
+ usb_manufacturer = "swtdr34mz"

@@ -1,0 +1,41 @@
+diff --git a/app/app.h b/app/app.h
+index 7aac020..f8c8992 100644
+--- a/app/app.h
++++ b/app/app.h
+@@ -1,3 +1,11 @@
++/* FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's mirror turned on (fm1.toml mirror = true), its
++ * buffers smaller so it fits: the send ring and the row segments (device/mirror.c) */
++#ifndef MRQ
++#define MRQ 1536u
++#endif
++#ifndef MR_SEGW
++#define MR_SEGW 240u
++#endif
+ /* SPDX-License-Identifier: MPL-2.0
+  * Copyright (C) 2026 Charles Vestal
+  * Copyright (C) 2026 Tomorrow's Man (TIDE) */
+diff --git a/app/fm1.toml b/app/fm1.toml
+index 710f292..cda3a9b 100644
+--- a/app/fm1.toml
++++ b/app/fm1.toml
+@@ -2,6 +2,7 @@
+ # tools/build.py: ./build.sh). The package identity, repo, install and site are SAMSARA's own since Phase 7
+ # (2026-11-11; ARCHITECTURE.md section 18).
+ name = "SAMSARA"               # the build's files: samsara.fwsc, samsara-X.Y.fwsc (AMB-1's: amb)
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ id_prefix = "FM-1_108"         # package identity: dev FM-1_10800, releases FM-1_108XXYYZZ (AMB-1's is FM-1_7)
+ usb_manufacturer = "SAMSARA"
+ usb_product = "SAMSARA FM-1"
+diff --git a/firmware.json b/firmware.json
+index dd3c51e..963d140 100644
+--- a/firmware.json
++++ b/firmware.json
+@@ -14,7 +14,7 @@
+   "hardware": {
+     "models": ["FM-1"],
+     "flash": ["856014", "B36014"],
+-    "features": ["usb-audio-in", "screen-reader"]
++    "features": ["usb-audio-in", "screen-reader", "screen-mirror"]
+   },
+   "credits": "From AMB-1 by Charles Vestal. Built on fm1-base and felucca-bsp, from Felucca by Leo Kuroshita (Hügelton Instruments)."
+ }

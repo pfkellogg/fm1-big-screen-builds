@@ -1,0 +1,40 @@
+diff --git a/app/app.h b/app/app.h
+index a611119..d43884e 100644
+--- a/app/app.h
++++ b/app/app.h
+@@ -1,3 +1,11 @@
++/* FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's mirror turned on (fm1.toml mirror = true), its
++ * buffers smaller so it fits: the send ring and the row segments (device/mirror.c) */
++#ifndef MRQ
++#define MRQ 2048u
++#endif
++#ifndef MR_SEGW
++#define MR_SEGW 60u
++#endif
+ /* SPDX-License-Identifier: MPL-2.0
+  * Copyright (C) 2026 Charles Vestal, Nick Culbertson */
+ /* MIGHTY ARCADE: a prototype on fm1-base, from Mighty Arp's stack. This header is the app's half of the contract with the
+diff --git a/app/fm1.toml b/app/fm1.toml
+index cffd0c5..9973bbd 100644
+--- a/app/fm1.toml
++++ b/app/fm1.toml
+@@ -1,5 +1,6 @@
+ # Mighty Arcade on fm1-base (tools/build.py), from Mighty Arp's stack
+ name = "MightyArcade"
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ id_prefix = "FM-1_6281"       # package identity: dev FM-1_628100, releases FM-1_6281XXYY (tools/xxyy.py, as Mighty Arp: 1.0 is FM-1_62810100, 8 digits, the Firmware Hub's longest)
+ usb_manufacturer = "Nick Culbertson"
+ usb_product = "Mighty Arcade FM-1"
+diff --git a/firmware.json b/firmware.json
+index ca54310..af671c9 100644
+--- a/firmware.json
++++ b/firmware.json
+@@ -14,7 +14,7 @@
+   "hardware": {
+     "models": ["FM-1"],
+     "flash": ["856014", "B36014"],
+-    "features": ["usb-audio-in", "usb-audio-out", "second-core", "velocity", "pressure", "screen-reader"]
++    "features": ["usb-audio-in", "usb-audio-out", "second-core", "velocity", "pressure", "screen-reader", "screen-mirror"]
+   },
+   "credits": "Built on fm1-base by Charles Vestal and felucca-bsp; the sound engine is Mighty Arp's"
+ }
