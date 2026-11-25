@@ -7,7 +7,7 @@ author's own firmware, built from their published source with a small addition, 
 **Big Knobs** and **Key Lights** where the firmware allows. Pick one and see what it looks like at
 **[aikellogg.com › Big Screen FWs](https://aikellogg.com/#/make-big-screen)**.
 
-**172 builds.** Every firmware here belongs to its author and keeps its own license; the credit, the license and the
+**173 builds.** Every firmware here belongs to its author and keeps its own license; the credit, the license and the
 exact source (repository and commit) are in the table, and each build's `.patch` is the complete set of changes.
 These builds are not made or supported by the authors: problems with a build go to
 [this repository's issues](https://github.com/pfkellogg/fm1-big-screen-builds/issues), not to them.
@@ -74,6 +74,7 @@ resources file too: install the `.fwsc`, then send `-res.bin` with Melodee's own
 | DUB-1 1.5.0 | sbegueria | GPL-3.0 | [sbegueria/fm1-dub](https://github.com/sbegueria/fm1-dub/tree/05b992a37f7dc7d11f49c22403966dec3ee20ba1) | [dub-1.5.0-bigscreen.fwsc](fw/dub-1.5.0-bigscreen.fwsc) · [patch](fw/dub-1.5.0-bigscreen.patch) | FM-1 Big Screen code added |
 | Dungeon Tracker 1.5 | Bourbon Weather | GPL-3.0 | [BourbonWX/Dungeon-Tracker](https://github.com/BourbonWX/Dungeon-Tracker/tree/4e43c2f34899237f685a10999b00213644aef394) | [dungeontracker-1.5-bigscreen.fwsc](fw/dungeontracker-1.5-bigscreen.fwsc) · [patch](fw/dungeontracker-1.5-bigscreen.patch) | FM-1 Big Screen code added |
 | DØG-5 0.5.1 | ZIGGY (DØGS) | GPL-3.0 | [vincentzsk-prod/dog5](https://github.com/vincentzsk-prod/dog5/tree/c7942bd4a88999287caedef88b7b9c3ad8e48622) | [dg5-0.5.1-bigscreen.fwsc](fw/dg5-0.5.1-bigscreen.fwsc) · [patch](fw/dg5-0.5.1-bigscreen.patch) | FM-1 Big Screen code added |
+| Erik37 1.3 | genkigenki | MPL-2.0 | [pfkellogg/erik37](https://github.com/pfkellogg/erik37/tree/50b69578b40e5ba0b5687a2ebdff0d25b8221728) | [erik37-1.3-bigscreen.fwsc](fw/erik37-1.3-bigscreen.fwsc) · [patch](fw/erik37-1.3-bigscreen.patch) | FM-1 Big Screen code added |
 | ESTAMPIE 0.4.0 | Drew Robinson | GPL-3.0 | [ocean/estampie](https://github.com/ocean/estampie/tree/31486c4c67a1eadc1dd7d85f41c3c4e499f1023b) | [estampie-0.4.0-bigscreen.fwsc](fw/estampie-0.4.0-bigscreen.fwsc) · [patch](fw/estampie-0.4.0-bigscreen.patch) | FM-1 Big Screen code added |
 | Fart Machine One 1.1.0 | adamcharleswilsonmusic-code | GPL-3.0 | [adamcharleswilsonmusic-code/Fart-Machine-One](https://github.com/adamcharleswilsonmusic-code/Fart-Machine-One/tree/5e49a216c18c6e0a7e5e42bef43843b40ad9ea5f) | [fart-1.1.0-bigscreen.fwsc](fw/fart-1.1.0-bigscreen.fwsc) · [patch](fw/fart-1.1.0-bigscreen.patch) | FM-1 Big Screen code added |
 | Felucca 1.8.3 | Leo Kuroshita (Hügelton Instruments) | GPL-3.0 | [hugelton/Felucca](https://github.com/hugelton/Felucca/tree/389ab2b6a846121fef64dbff28dd05357e82aa52) | [felucca-1.8.3-bigscreen.fwsc](fw/felucca-1.8.3-bigscreen.fwsc) · [patch](fw/felucca-1.8.3-bigscreen.patch) | FM-1 Big Screen code added |

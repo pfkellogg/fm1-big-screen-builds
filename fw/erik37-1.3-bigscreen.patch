@@ -1,0 +1,538 @@
+diff --git a/app/app.c b/app/app.c
+index 082b620..70496da 100644
+--- a/app/app.c
++++ b/app/app.c
+@@ -559,6 +559,10 @@ void app_say(const char *a, const char *b)
+ 
+ #include "ui.c"
+ #include "boot.c"
++#ifdef ERIK_BIG_SCREEN
++#include "big_screen.c"                    /* the FM-1 Big Screen mirror over USB */
++int app_sysex(const uint8_t *p, uint32_t n) { return bs_usb_sysex(p, n); }
++#endif
+ 
+ /* ---------------------------------------------------------------- the voices and the presets, chosen */
+ static void sound_changed(void)              /* tone, room ... all at once: every page and the header again */
+@@ -1395,6 +1399,9 @@ void app_ui_init(void)
+ void app_frame(void)
+ {
+     input();
++#ifdef ERIK_BIG_SCREEN
++    bs_service();
++#endif
+     if (ui.state == ST_BOOT) {
+         uint32_t t = plat_ms() - ui.boot_t0;
+         int f = (int)(t / BOOT_MS);
+diff --git a/app/app.h b/app/app.h
+index 81d5d89..c763e05 100644
+--- a/app/app.h
++++ b/app/app.h
+@@ -38,6 +38,14 @@ void app_frame(void);
+ void app_input_only(void);
+ void app_say(const char *a, const char *b);
+ 
++#ifndef PLAT_HOST
++/* Big Screen: the screen over USB to FM-1 Mirror / FM-1 Mirror + Spyglass (big_screen.c) */
++#define ERIK_BIG_SCREEN 1
++#define APP_SYSEX                        /* the Big Screen apps' hello over USB-MIDI (F0 7D 'F' 'S' xx F7) */
++int app_sysex(const uint8_t *p, uint32_t n);
++void bs_lcd(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint16_t *px, uint16_t c);
++#endif
++
+ #ifdef PLAT_HOST
+ #define APP_HOST_EXPECT                  /* the host simulator's checks (tests/ *.txt): page, tone, room, voices ... */
+ int app_expect(const char *what, int *got);
+diff --git a/app/big_screen.c b/app/big_screen.c
+new file mode 100644
+index 0000000..a47b54e
+--- /dev/null
++++ b/app/big_screen.c
+@@ -0,0 +1,226 @@
++/* SPDX-License-Identifier: MIT
++ * Copyright (c) 2026 Patrick F. Kellogg
++ *
++ * Erik37 + FM-1 Big Screen (USB): while an app asks (F0 7D 'F' 'S' 00/01/02 F7, about once a second),
++ * every rectangle sent to the LCD (fm1-base device/lcd.c lcd_fill / lcd_blit: bs_lcd) also goes out over USB as
++ * SysEx, so FM-1 Mirror (github.com/pfkellogg/fm1-mirror) and FM-1 Mirror + Spyglass show the screen big, with the
++ * voice playing ("ERIK37 CONCERT") on top of the spyglass. screen_mirror.c makes the messages; this is the glue.
++ *
++ *   in:   the hello comes through app_sysex (app.c, APP_SYSEX).
++ *   out:  plat_sysex_try (device/unity.c): into the USB SysEx ring, never waiting on it, so the piano never waits on
++ *         the screen. A row that doesn't fit is forgotten and drawn again later.
++ * Nobody asking: nothing is done (bs_lcd returns at once).
++ */
++#define SM_BUFFER 2048u                         /* 2 KB of queued messages */
++#include "screen_mirror.c"
++
++static uint16_t bs_row[240];                     /* one row, back in RGB565 order (the panel's buffers are swapped) */
++static uint8_t bs_new;                           /* a viewer just came: the whole screen for it */
++/* What the viewer has: a 16-bit hash of each 40-pixel segment of each row (0: not known, send it). Erik37 draws
++ * whole 240-pixel bands where something changed: only the segments that changed go out. */
++#define BS_SEGW 40u
++#define BS_NSEG 6u
++static uint16_t bs_hash[240][BS_NSEG];
++static uint8_t bs_redo;                          /* segments dropped: the app draws everything again */
++static uint32_t bs_redo_at;                      /* the last such redraw asked for */
++
++/* Big Knobs, Key Lights and the remote presses (FM-1 Big Screen 1.3.23 on): the app turns the knobs (04 e n), sets
++ * MASTER (06 lo hi), presses buttons and keys (07 id down); the lit and glowing buttons and keys go to it (05). They
++ * go in through fm1-base's own remote (plat_fm1.c: remote.btn / keys / enc / master), the path tools/fm1_remote.py
++ * takes, so Erik37 sees them as the player's hands. Our ids: buttons 0 OCT- 1 OCT+ 2 FX .. 13 REC, keys 14 + k. */
++static uint32_t bs_btn, bs_keys;                 /* what the app holds down (let go when it stops asking) */
++static uint32_t bs_lit_b, bs_lit_k, bs_dim_b;    /* the lights as plat_leds set them (our ids) */
++static inline uint32_t bs_b_of(uint32_t id) { return id >= 2u ? id - 2u : 12u + id; }   /* our id -> B_* */
++static inline uint32_t bs_id_of(uint32_t b) { return b >= 12u ? b - 12u : b + 2u; }     /* B_* -> our id */
++void bs_lights(uint32_t buttons, uint32_t keys, uint32_t dim)   /* plat_fm1.c plat_leds */
++{
++    uint32_t b, lb = 0, db = 0;
++    for (b = 0; b < NB; b++) {
++        if (buttons >> b & 1u)
++            lb |= 1u << bs_id_of(b);
++        else if (dim >> b & 1u)
++            db |= 1u << bs_id_of(b);
++    }
++    bs_lit_b = lb;
++    bs_dim_b = db;
++    bs_lit_k = keys;
++}
++static void bs_panel_in(const uint8_t *p, uint32_t n)
++{
++    static const uint8_t EN[7] = {EN_SELECT, EN_ALGO, EN_K1, EN_K2, EN_K3, EN_K4, EN_PRESET};
++    if (n != 6u)
++        return;
++    if (p[3] == 4u && p[4] < 7u) {               /* a knob: n clicks, 7-bit signed */
++        int32_t d = p[5] & 127u;
++        remote.enc[EN[p[4]]] += d >= 64 ? d - 128 : d;
++    } else if (p[3] == 6u) {                     /* MASTER 0..1023 */
++        uint32_t v = (uint32_t)(p[4] & 127u) | (uint32_t)(p[5] & 127u) << 7;
++        remote.master = (int32_t)((v > 1023u ? 1023u : v) * 4096u / 1023u);
++    } else if (p[3] == 7u) {                     /* a button or key, down or up */
++        uint32_t id = p[4];
++        if (id < 14u) {
++            uint32_t bit = 1u << bs_b_of(id);
++            bs_btn = p[5] ? bs_btn | bit : bs_btn & ~bit;
++            remote.btn = p[5] ? remote.btn | bit : remote.btn & ~bit;
++        } else if (id < 14u + NKEYS) {
++            uint32_t bit = 1u << (id - 14u);
++            bs_keys = p[5] ? bs_keys | bit : bs_keys & ~bit;
++            remote.keys = p[5] ? remote.keys | bit : remote.keys & ~bit;
++        }
++    }
++}
++static void bs_panel_service(uint32_t now)       /* the lights out (on change, at most every 20 ms, and once a second) */
++{
++    static uint32_t sent_at, lb = ~0u, lk = ~0u, ld = ~0u;
++    uint8_t m[18];
++    if (!sm_on()) {
++        if (bs_btn | bs_keys) {                  /* the app went away: what it held is let go */
++            remote.btn &= ~bs_btn;
++            remote.keys &= ~bs_keys;
++            bs_btn = bs_keys = 0;
++        }
++        return;
++    }
++    if (now - sent_at < 20u || (bs_lit_b == lb && bs_lit_k == lk && bs_dim_b == ld && now - sent_at < 1000u))
++        return;
++    m[0] = 0xF0; m[1] = 0x7D; m[2] = 'F'; m[3] = 'S'; m[4] = 5;
++    m[5] = bs_lit_k & 127u; m[6] = bs_lit_k >> 7 & 127u; m[7] = bs_lit_k >> 14 & 127u; m[8] = bs_lit_k >> 21 & 127u;
++    m[9] = bs_lit_b & 127u; m[10] = bs_lit_b >> 7 & 127u;
++    m[11] = m[12] = m[13] = m[14] = 0;           /* glowing keys: none (Erik37 dims buttons only) */
++    m[15] = bs_dim_b & 127u; m[16] = bs_dim_b >> 7 & 127u; m[17] = 0xF7;
++    if (plat_sysex_try(m, 18) == 0) {
++        sent_at = now;
++        lb = bs_lit_b;
++        lk = bs_lit_k;
++        ld = bs_dim_b;
++    }
++}
++
++/* app.c app_sysex: a SysEx frame from USB (the bytes between F0 and F7); 1 = ours, taken */
++int bs_usb_sysex(const uint8_t *p, uint32_t n)
++{
++    uint8_t m[6];
++    if (n < 4u || p[0] != 0x7Du || p[1] != 'F' || p[2] != 'S')
++        return 0;
++    if (n > 4u) {                                /* Big Knobs, MASTER, a press */
++        bs_panel_in(p, n);
++        return 1;
++    }
++    m[0] = 0xF0; m[1] = 0x7D; m[2] = 'F'; m[3] = 'S'; m[4] = p[3]; m[5] = 0xF7;
++    sm_sysex(m, 6);                              /* (a new viewer, or 01: sm_take_full_request, the whole screen) */
++    return 1;
++}
++
++/* one SysEx message (F0 .. F7) out over USB: 0 sent, -2 busy (again later), -1 nobody there */
++static int bs_send(const uint8_t *m, unsigned n)
++{
++    return plat_sysex_try(m, n);
++}
++
++static uint16_t bs_seg_hash(const uint16_t *p, uint32_t n)
++{
++    uint32_t i, h = 2166136261u;                 /* FNV-1a over the pixels */
++    for (i = 0; i < n; i++)
++        h = (h ^ p[i]) * 16777619u;
++    h = (h ^ (h >> 16)) & 0xFFFFu;
++    return (uint16_t)(h ? h : 1u);
++}
++
++/* queue pixels a .. b-1 of row y (bs_row holds x ..): 1 queued. Waits a little for room (USB empties fast), never
++ * long: the drawing (and so the keys' response) goes on */
++static int bs_queue(uint32_t x, uint32_t a, uint32_t b, uint32_t y, uint32_t start)
++{
++    uint32_t t0 = plat_ms();
++    while (!sm_rows(bs_row + (a - x), a, y, b - a, 1)) {
++        if (plat_ms() - t0 > 20u || plat_ms() - start > 60u)
++            return 0;
++        sm_poll(plat_ms(), bs_send);
++    }
++    return 1;
++}
++
++static void bs_run(uint32_t x, uint32_t a0, uint32_t b0, uint32_t yy, uint32_t start, const uint16_t *nh)
++{
++    uint32_t k, ok = bs_queue(x, a0, b0, yy, start);
++    for (k = a0 / BS_SEGW; k <= (b0 - 1u) / BS_SEGW; k++)
++        bs_hash[yy][k] = ok ? nh[k] : 0u;
++    if (!ok)
++        bs_redo = 1;
++}
++
++/* lcd.c: a rectangle about to go to the LCD; px (the panel's byte order, w pixels a row) or, for a fill, NULL and
++ * the colour c. Each row's segments that changed go out; a segment only partly covered goes out as drawn, and the
++ * viewer's copy of it is then unknown */
++void bs_lcd(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint16_t *px, uint16_t c)
++{
++    uint32_t r, i, start = plat_ms();
++    if (!sm_on() || !w || x >= 240u || y >= 240u)
++        return;
++    if (x + w > 240u)
++        w = 240u - x;
++    if (y + h > 240u)
++        h = 240u - y;
++    for (r = 0; r < h; r++) {
++        uint32_t yy = y + r, s, a0 = 0, b0 = 0, run = 0;
++        uint16_t nh[BS_NSEG];
++        for (i = 0; i < w; i++)
++            bs_row[i] = px ? (uint16_t)((px[r * w + i] >> 8) | (px[r * w + i] << 8)) : c;
++        for (s = x / BS_SEGW; s <= (x + w - 1u) / BS_SEGW; s++) {
++            uint32_t a = s * BS_SEGW > x ? s * BS_SEGW : x, b = (s + 1u) * BS_SEGW < x + w ? (s + 1u) * BS_SEGW : x + w;
++            int whole = a == s * BS_SEGW && b == (s + 1u) * BS_SEGW, changed = 1;
++            nh[s] = 0;
++            if (whole) {
++                nh[s] = bs_seg_hash(bs_row + (a - x), BS_SEGW);
++                changed = nh[s] != bs_hash[yy][s];
++            }
++            if (changed && run && a == b0) {     /* (joins the run before it) */
++                b0 = b;
++                continue;
++            }
++            if (run) {                           /* the run before it goes */
++                bs_run(x, a0, b0, yy, start, nh);
++                run = 0;
++            }
++            if (changed) {
++                a0 = a;
++                b0 = b;
++                run = 1;
++            }
++        }
++        if (run)
++            bs_run(x, a0, b0, yy, start, nh);
++    }
++}
++
++/* app.c app_frame (the main loop): sending what's queued, the voice's name, and the whole screen for a new viewer
++ * (or, after segments were dropped, what's missing: at most five times a second) */
++void bs_service(void)
++{
++    static char name[24];
++    uint32_t now = plat_ms();
++    sm_poll(now, bs_send);
++    bs_panel_service(now);
++    if (sm_on()) {
++        const char *v = TONE_NAME[set.tone & 3];
++        uint32_t i = 0, k;
++        for (k = 0; "ERIK37 "[k]; k++)
++            name[i++] = "ERIK37 "[k];
++        for (k = 0; v[k] && i < sizeof name - 1u; k++)
++            name[i++] = v[k];
++        name[i] = 0;
++        sm_name(name, now, bs_send);
++    }
++    if (sm_take_full_request() | bs_new) {      /* a new viewer: it has nothing yet */
++        uint32_t k;
++        for (k = 0; k < 240u * BS_NSEG; k++)
++            bs_hash[k / BS_NSEG][k % BS_NSEG] = 0;
++        bs_new = 0;
++        bs_redo = 1;
++        bs_redo_at = now - 1000u;
++    }
++    if (bs_redo && sm_on() && ui.state == ST_RUN && now - bs_redo_at >= 200u) {
++        bs_redo = 0;                             /* every band again: what the viewer has is skipped */
++        bs_redo_at = now;
++        ui.full = 1;
++    }
++}
+diff --git a/app/screen_mirror.c b/app/screen_mirror.c
+new file mode 100644
+index 0000000..17f9b9a
+--- /dev/null
++++ b/app/screen_mirror.c
+@@ -0,0 +1,137 @@
++/* SPDX-License-Identifier: MIT
++ * Copyright (c) 2026 Patrick F. Kellogg
++ *
++ * FM-1 screen mirror, firmware-neutral version of the "Screen mirror" section
++ * in app/screen.c of the screen-out branch. Messages (see README.md):
++ *   in:  F0 7D 'F' 'S' 00 F7  (01: and send the whole screen again; 02: only the sound's name, no screen)
++ *   out: F0 7D 'F' 'S' 01 row_lo row_hi col_lo col_hi {count c0-6 c7-13 c14-15}... F7
++ *        F0 7D 'F' 'S' 02 name... F7  (the sound playing, in ASCII: sm_name; after each hello and when it changes)
++ * Each message is at most SM_MESSAGE bytes, so it shares a small USB queue with notes.
++ */
++#include "screen_mirror.h"
++
++#ifndef SM_BUFFER
++#define SM_BUFFER 16384u /* queued messages, each with a length byte in front */
++#endif
++#define SM_MESSAGE 70u
++#define SM_TIMEOUT 3000u
++
++/* (sm_ prefixed: a firmware built as one compilation unit, like ChoralRoot, may have its own "buffer", "length"...) */
++#ifndef SM_SECTION
++#define SM_SECTION /* a firmware short of RAM can place the buffer elsewhere */
++#endif
++static uint8_t sm_buffer[SM_BUFFER] SM_SECTION;
++static unsigned sm_length, sm_sent, sm_live, sm_hello, sm_full;
++static uint32_t sm_heard;
++static unsigned sm_name_hello, sm_name_live, sm_name_due;
++static uint32_t sm_name_heard;
++static char sm_name_last[48];
++
++int sm_sysex(const uint8_t *m, unsigned n)
++{
++    if (n != 6 || m[0] != 0xf0 || m[1] != 0x7d || m[2] != 'F' || m[3] != 'S' || m[5] != 0xf7)
++        return 0;
++    sm_name_hello = 1;                 /* every hello also asks for the sound's name */
++    if (m[4] != 2)
++        sm_hello = 1u + (m[4] == 1);
++    return 1;
++}
++
++int sm_on(void) { return sm_live || sm_hello; }
++
++int sm_take_full_request(void)
++{
++    unsigned f = sm_full;
++    sm_full = 0;
++    return (int)f;
++}
++
++int sm_rows(const uint16_t *px, unsigned left, unsigned top, unsigned width, unsigned rows)
++{
++    unsigned before = sm_length;
++    for (unsigned row = 0; row < rows; ++row, px += width)
++        for (unsigned i = 0; i < width;) {
++            if (sm_length + 1u + SM_MESSAGE > SM_BUFFER) { /* room for a whole message, or wait */
++                if (!before) return 1; /* bigger than the whole buffer: sent as far as it fits */
++                sm_length = before;
++                return 0;
++            }
++            uint8_t *out = sm_buffer + sm_length;
++            unsigned y = top + row, x = left + i, k = 10;
++            out[1] = 0xf0; out[2] = 0x7d; out[3] = 'F'; out[4] = 'S'; out[5] = 1;
++            out[6] = (uint8_t)(y & 127u); out[7] = (uint8_t)(y >> 7);
++            out[8] = (uint8_t)(x & 127u); out[9] = (uint8_t)(x >> 7);
++            for (; i < width && k + 5u <= SM_MESSAGE; k += 4) {
++                unsigned run = 1, c = px[i];
++                while (i + run < width && run < 127 && px[i + run] == c) ++run;
++                out[k] = (uint8_t)run;
++                out[k + 1] = (uint8_t)(c & 127u);
++                out[k + 2] = (uint8_t)((c >> 7) & 127u);
++                out[k + 3] = (uint8_t)(c >> 14);
++                i += run;
++            }
++            out[k] = 0xf7;
++            out[0] = (uint8_t)k;
++            sm_length += 1u + k;
++        }
++    return 1;
++}
++
++void sm_poll(uint32_t now, sm_send_fn send)
++{
++    if (sm_hello) {
++        sm_heard = now;
++        if (!sm_live || sm_hello > 1) sm_full = 1;
++        sm_hello = 0;
++        sm_live = 1;
++    }
++    if (now - sm_heard >= SM_TIMEOUT) sm_live = 0;
++    while (sm_live && sm_sent < sm_length) {
++        int r = send(sm_buffer + sm_sent + 1, sm_buffer[sm_sent]);
++        if (r == -2) break; /* busy: the rest next time */
++        if (r) sm_live = 0;
++        sm_sent += 1u + sm_buffer[sm_sent];
++    }
++    if (!sm_live || sm_sent >= sm_length) {
++        sm_length = sm_sent = 0;
++    } else if (sm_sent) {
++        /* Move what's left to the front, so the room it freed takes new rows now (with a small buffer, waiting for
++         * all of it to go first held the screen up too long). Forward copy: the data only moves down. */
++        unsigned i, n = sm_length - sm_sent;
++        for (i = 0; i < n; i++)
++            sm_buffer[i] = sm_buffer[sm_sent + i];
++        sm_length = n;
++        sm_sent = 0;
++    }
++}
++
++void sm_name(const char *name, uint32_t now, sm_send_fn send)
++{
++    uint8_t m[6 + 48];
++    unsigned i, n = 5, same = 1;
++    if (sm_name_hello) {               /* a hello (of either kind): send the name now, and keep it fresh 3 s */
++        sm_name_hello = 0;
++        sm_name_heard = now;
++        sm_name_live = 1;
++        sm_name_due = 1;
++    }
++    if (now - sm_name_heard >= SM_TIMEOUT) sm_name_live = 0;
++    if (!sm_name_live) return;
++    for (i = 0; i < sizeof sm_name_last - 1u && name[i]; ++i)
++        if (sm_name_last[i] != name[i]) same = 0;
++    if (sm_name_last[i]) same = 0;
++    if (!same) {
++        for (i = 0; i < sizeof sm_name_last - 1u && name[i]; ++i) sm_name_last[i] = name[i];
++        sm_name_last[i] = 0;
++        sm_name_due = 1;
++    }
++    if (!sm_name_due) return;
++    m[0] = 0xf0; m[1] = 0x7d; m[2] = 'F'; m[3] = 'S'; m[4] = 2;
++    for (i = 0; sm_name_last[i]; ++i) {
++        uint8_t c = (uint8_t)sm_name_last[i];
++        m[n++] = c < 0x20 || c > 0x7e ? (uint8_t)' ' : c;   /* 7-bit only (the header's middle dot: a space) */
++    }
++    m[n++] = 0xf7;
++    i = (unsigned)send(m, n);
++    if ((int)i == 0) sm_name_due = 0;  /* busy (-2) or not sent: again next time */
++}
+diff --git a/app/screen_mirror.h b/app/screen_mirror.h
+new file mode 100644
+index 0000000..06d9113
+--- /dev/null
++++ b/app/screen_mirror.h
+@@ -0,0 +1,41 @@
++/* SPDX-License-Identifier: MIT
++ * Copyright (c) 2026 Patrick F. Kellogg
++ *
++ * FM-1 screen mirror: sends the screen over USB MIDI SysEx to FM-1 Mirror
++ * (github.com/pfkellogg/fm1-mirror) or any app that speaks the same messages.
++ * Firmware-neutral: it needs only the rows you send to the LCD, a millisecond
++ * clock and a way to send one SysEx message. See README.md.
++ */
++#ifndef SCREEN_MIRROR_H
++#define SCREEN_MIRROR_H
++#include <stdint.h>
++
++/* Sends one complete SysEx message (F0 ... F7). Return 0 when sent, -2 when
++ * the output is busy (try the same message again later), anything else to
++ * stop mirroring. */
++typedef int (*sm_send_fn)(const uint8_t *message, unsigned length);
++
++/* Call for every incoming SysEx message; returns 1 if it was a mirror hello
++ * (F0 7D 'F' 'S' 00/01/02 F7; 02 asks only for the sound's name), which the caller can then ignore. */
++int sm_sysex(const uint8_t *m, unsigned n);
++
++/* 1 while an app is asking: only then is sm_rows worth calling. */
++int sm_on(void);
++
++/* 1 once when the app wants the whole screen (a new viewer): repaint everything. */
++int sm_take_full_request(void);
++
++/* Queue `rows` rows of RGB565 pixels, `width` wide, whose top-left is (left, top).
++ * Returns 0 when the buffer has no room yet: call again with the same rows after
++ * sm_poll has sent some (or skip, and repaint those rows later). */
++int sm_rows(const uint16_t *pixels, unsigned left, unsigned top, unsigned width, unsigned rows);
++
++/* Call often (e.g. every main-loop pass) with the time in milliseconds: sends what's
++ * queued, and stops mirroring 3 s after the last hello. */
++void sm_poll(uint32_t now_ms, sm_send_fn send);
++
++/* Call often with the sound playing now ("T1 FM6 ICE BELL", ASCII, up to 47 characters): while an app asks (any
++ * hello in the last 3 s), sends it as F0 7D 'F' 'S' 02 name... F7 after each hello and whenever it changes. */
++void sm_name(const char *name, uint32_t now_ms, sm_send_fn send);
++
++#endif
+diff --git a/base/device/lcd.c b/base/device/lcd.c
+index 8ca8737..0247207 100644
+--- a/base/device/lcd.c
++++ b/base/device/lcd.c
+@@ -85,6 +85,9 @@ static void lcd_fill(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint16_t c)
+         w = 240u - x;
+     if (y + h > 240u)
+         h = 240u - y;
++#ifdef ERIK_BIG_SCREEN
++    bs_lcd(x, y, w, h, 0, (uint16_t)c);           /* the FM-1 Big Screen mirror (the app's big_screen.c) */
++#endif
+     lcd_sync();
+     k = 240u / w * w;                       /* whole rows per transfer (narrow fills: one DMA) */
+     for (i = 0; i < k; i++)
+@@ -101,6 +104,9 @@ static void lcd_blit(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint1
+ {
+     if (!w || !h)
+         return;
++#ifdef ERIK_BIG_SCREEN
++    bs_lcd(x, y, w, h, px, 0);                    /* the FM-1 Big Screen mirror (the app's big_screen.c) */
++#endif
+     lcd_window(x, y, x + w - 1u, y + h - 1u);
+     lcd_data(px, w * h * 2u);
+ }
+diff --git a/base/device/plat_fm1.c b/base/device/plat_fm1.c
+index 0e3d33f..3812265 100644
+--- a/base/device/plat_fm1.c
++++ b/base/device/plat_fm1.c
+@@ -225,9 +225,11 @@ static void led_pos_init(void)
+                     led_pos[id] = (uint8_t)((p << 3) | r);
+     }
+ }
++void bs_lights(uint32_t buttons, uint32_t keys, uint32_t dim);   /* FM-1 Big Screen's Key Lights (app/big_screen.c) */
+ /* the dim ones: felucca-bsp's glow, a short pulse on every scan frame, in two strengths (fm1_led_dim_level) */
+ void plat_lights(uint32_t buttons, uint32_t keys, uint32_t dim_buttons, uint32_t dim_keys, int glow)
+ {
++    bs_lights(buttons | (buttons & LED_PLAY_GREEN ? 1u << B_PLAY : 0u), keys, dim_buttons);
+     static int level = -1;
+     uint8_t nl[FM1_NCOL] = {0}, dl[FM1_NCOL] = {0};
+     uint32_t i, c;
+diff --git a/base/device/unity.c b/base/device/unity.c
+index 315bab2..f95b483 100644
+--- a/base/device/unity.c
++++ b/base/device/unity.c
+@@ -192,6 +192,15 @@ static int ann_wire_send(const uint8_t *p, uint32_t n)   /* never waits: no room
+         return -1;
+     return ota_wire_send(p, n);
+ }
++/* plat.h: a SysEx frame out over USB that never waits: 0 sent, -2 no room now (again later), -1 no computer */
++int plat_sysex_try(const uint8_t *p, uint32_t n)
++{
++    if (!usb.config || usb.suspended)
++        return -1;
++    if (SXQ - (so_w - so_r) < (n + 2u) / 3u)
++        return -2;
++    return ota_wire_send(p, n) ? -1 : 0;
++}
+ #include "panel.c"
+ #if FM1B_BLE || FM1B_WIFI
+ #include "radio.c"                /* the shim's platform, a radio's start; Bluetooth MIDI (FM1B_BLE, ble/: the shim, the
+diff --git a/base/include/plat.h b/base/include/plat.h
+index 30f3f95..8afb091 100644
+--- a/base/include/plat.h
++++ b/base/include/plat.h
+@@ -138,6 +138,7 @@ void plat_log(const char *line);
+ const uint8_t *plat_data(uint32_t off);   /* read in place; 0 = outside the area */
+ int plat_data_erase(uint32_t off);        /* the 4 KiB sector at off (aligned); 0 = done */
+ int plat_data_write(uint32_t off, const void *src, uint32_t n);   /* into erased flash, src in RAM; 0 = done */       /* a line for the radio's log (fm1_remote.py log; it survives a restart) */
++int plat_sysex_try(const uint8_t *frame, uint32_t n);   /* the same, never waiting: 0 sent, -2 no room now, -1 no computer */
+ void plat_sysex_send(const uint8_t *frame, uint32_t n);   /* a whole SysEx frame (F0 .. F7) out over USB */                 /* long work in the main loop (drawing) lets the app's background run (app_yield) */
+ 
+ /* the keys' velocity and pressure (an app with APP_KEY_SENSE): on, the scan reads the keys on the analog rows and
