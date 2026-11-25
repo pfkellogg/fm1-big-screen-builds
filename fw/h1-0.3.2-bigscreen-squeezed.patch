@@ -1,19 +1,61 @@
+diff --git a/app/app.c b/app/app.c
+index a18b255..1c03973 100644
+--- a/app/app.c
++++ b/app/app.c
+@@ -890,3 +890,39 @@ void app_say(const char *a, const char *b)
+     if (ann_on())
+         ann_say(a, b, ANN_NOW | ANN_KEEP);
+ }
++
++/* FM-1 Big Screen (unofficial build, aikellogg.com): a row of what the panel shows, for the mirror's repair */
++const uint16_t *app_mirror_row(uint32_t y)
++{
++    static uint16_t row[H1_W];
++    const uint8_t *s = h1_panel() + y * H1_W;
++    for (int i = 0; i < H1_W; i++)
++        row[i] = pal_be[s[i]];
++    return row;
++}
++
++/* FM-1 Big Screen: the mirror's counters in the development readout (F0 7D 4C 47 F7) */
++void fm1bs_mr_counts(uint32_t *o);
++void app_log(void (*line)(const char *t))
++{
++    static const char *const N[9] = {"bytes", "rects", "rows", "drops", "skipped", "redraws", "px", "waits", "timeouts"};
++    uint32_t o[9];
++    char b[40];
++    fm1bs_mr_counts(o);
++    for (int k = 0; k < 9; k++) {
++        char *q = b;
++        const char *s = N[k];
++        uint32_t v = o[k];
++        char d[12];
++        int n = 0;
++        *q++ = 'm'; *q++ = 'r'; *q++ = ' ';
++        while (*s)
++            *q++ = *s++;
++        *q++ = ' ';
++        do { d[n++] = (char)('0' + v % 10u); v /= 10u; } while (v);
++        while (n)
++            *q++ = d[--n];
++        *q = 0;
++        line(b);
++    }
++}
 diff --git a/app/app.h b/app/app.h
-index 2b39943..6c36340 100644
+index 2b39943..00f3452 100644
 --- a/app/app.h
 +++ b/app/app.h
-@@ -1,3 +1,11 @@
-+/* FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's mirror turned on (fm1.toml mirror = true), its
-+ * buffers smaller so it fits: the send ring and the row segments (device/mirror.c) */
-+#ifndef MRQ
-+#define MRQ 1536u
-+#endif
-+#ifndef MR_SEGW
-+#define MR_SEGW 240u
-+#endif
- /* h1 on the FM-1: the app's half of fm1-base's contract (device/unity.c includes this, then app.c). */
- #pragma once
- #include <stdint.h>
+@@ -4,6 +4,9 @@
+ #include "plat.h"
+ 
+ #define APP_NAME "h1"
++#define FM1BS_MIRROR_PACE                /* FM-1 Big Screen: wait for the link, never drop (device/mirror.c) */
++#define APP_MIRROR_ROW                   /* FM-1 Big Screen: app_mirror_row() in app.c */
++#define APP_LOG                          /* FM-1 Big Screen: the mirror counters (app_log in app.c) */
+ #define APP_SPLASH                       /* no paper splash: the screen stays the bezel's black until the */
+ void app_splash(void);                   /* instrument comes up */
+ #define APP_SPLASH_RGB RGB(0, 0, 0)
 diff --git a/app/fm1.toml b/app/fm1.toml
 index 417d976..e9fafdc 100644
 --- a/app/fm1.toml
@@ -35,6 +77,116 @@ index 417d976..e9fafdc 100644
  # USB audio: the FM-1 is a USB audio input beside its USB MIDI (one composite device), so a computer or a phone
  # records it straight off the cable: the sound at MASTER. Nothing played back through it (usb_audio_out).
  usb_audio_in = true
+Submodule base contains modified content
+diff --git a/base/device/mirror.c b/base/device/mirror.c
+index 7162da6..e3b31d8 100644
+--- a/base/device/mirror.c
++++ b/base/device/mirror.c
+@@ -225,8 +225,35 @@ static void mr_rows_dirty(uint32_t y, uint32_t h)
+ }
+ 
+ /* the frame in mr_wire (w bytes) to the ring: 1 sent, 0 no room */
++#ifdef FM1BS_MIRROR_PACE
++static uint32_t fm1bs_mr_waits, fm1bs_mr_timeouts;
++#endif
++/* FM-1 Big Screen: the mirror's counters, for the app's development readout (F0 7D 4C 47 F7, APP_LOG) */
++void fm1bs_mr_counts(uint32_t *o);
++void fm1bs_mr_counts(uint32_t *o)
++{
++    o[0] = mr.bytes; o[1] = mr.rects; o[2] = mr.rows; o[3] = mr.drops; o[4] = mr.skipped; o[5] = mr.redraws; o[6] = mr.px;
++#ifdef FM1BS_MIRROR_PACE
++    o[7] = fm1bs_mr_waits; o[8] = fm1bs_mr_timeouts;
++#else
++    o[7] = o[8] = 0;
++#endif
++}
+ static int mr_send(uint32_t w)
+ {
++#ifdef FM1BS_MIRROR_PACE
++    /* FM-1 Big Screen (unofficial build, aikellogg.com): wait for room (the USB interrupt drains the ring) rather than
++     * drop: the app draws at the link's pace while the big screen is on, and every picture arrives whole */
++    {
++        uint32_t t0 = plat_ms();
++        if (mr_free() < w)
++            fm1bs_mr_waits++;
++        while (!mr_busy() && mr_free() < w && plat_ms() - t0 < 150u) {
++        }
++        if (mr_free() < w)
++            fm1bs_mr_timeouts++;
++    }
++#endif
+     if (mr_busy() || mr_free() < w)
+         return 0;
+     mr_put(mr_wire, w);
+@@ -496,6 +523,9 @@ static void mirror_cmd(uint32_t op)
+ static void mr_wr16(uint8_t *p, uint32_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); }
+ static void mr_wr32(uint8_t *p, uint32_t v) { mr_wr16(p, v); mr_wr16(p + 2, v >> 16); }
+ 
++#ifdef APP_MIRROR_ROW
++const uint16_t *app_mirror_row(uint32_t y);   /* FM-1 Big Screen: the app's picture, a row */
++#endif
+ /* the main loop, each pass: the input report, a redraw when rows are dirty, off when the host went away */
+ static void mirror_step(void)
+ {
+@@ -513,7 +543,28 @@ static void mirror_step(void)
+     any = 0;                                          /* rows dirty: the UI draws again once the ring has room */
+     for (i = 0; i < sizeof mr.dirty / 4u; i++)
+         any |= mr.dirty[i];
++#ifdef APP_MIRROR_ROW
++    /* FM-1 Big Screen (unofficial build, aikellogg.com): dirty rows straight from the app's picture, as the ring has
++     * room, round the screen from where the last pass stopped */
++    if (any) {
++        static uint32_t cur;
++        uint32_t k, n = 0;
++        for (k = 0; k < MR_H && n < 24u && mr_free() >= 1536u; k++) {
++            uint32_t y = (cur + k) % MR_H;
++            if (mr_bit(mr.dirty, y)) {
++                mirror_blit(0, y, MR_W, 1, app_mirror_row(y));
++                if (mr_bit(mr.dirty, y))
++                    break;
++                n++;
++            }
++        }
++        cur = (cur + k) % MR_H;
++    }
++    mr.ask_redraw = 0;
++    if (0) {
++#else
+     if ((any || mr.ask_redraw) && now - mr.redraw_t >= MR_REDRAW_MS && mr_free() >= MR_REDRAW_ROOM) {
++#endif
+         mr.ask_redraw = 0;
+         mr.redraw_t = now;
+         mr.redraws++;
+diff --git a/base/device/unity.c b/base/device/unity.c
+index f4e304c..cf2d9ba 100644
+--- a/base/device/unity.c
++++ b/base/device/unity.c
+@@ -78,7 +78,15 @@
+ #define FM1_INPUT_HZ FM1B_INPUT_HZ
+ #define FM1_T5_PERIOD (6000000u / FM1B_T5_HZ)   /* (felucca-bsp's fm1_timer.h: 600 at 10 kHz) */
+ #define FM1B_T5_SCAN_DIV (FM1B_T5_HZ / FM1B_INPUT_HZ)
+-#define FM1B_T5_USB_DIV (FM1B_T5_HZ / 2000)    /* (5000: 2, 2.5 kHz: never slower than 2 kHz) */
++#ifdef FM1BS_FAST_USB                 /* FM-1 Big Screen (unofficial build): USB every tick, the screen 5x */
++#define FM1B_T5_USB_DIV 1
++#define FELUCCA_MIDI_TX_STALL_POLLS (FM1B_T5_HZ / 20u)
++#ifndef FELUCCA_UAC_STALL_POLLS
++#define FELUCCA_UAC_STALL_POLLS (FM1B_T5_HZ / 50u)
++#endif
++#else
++#define FM1B_T5_USB_DIV (FM1B_T5_HZ / 2000)
++#endif    /* (5000: 2, 2.5 kHz: never slower than 2 kHz) */
+ #define FM1B_T5_APP_DIV (FM1B_T5_HZ / 1000)
+ #define FM1B_T5_WRAP (FM1B_T5_HZ == 2000 ? 2 : 10)   /* a multiple of the three */
+ #define FM1B_T5_LATE_US (3000000u / FM1B_T5_HZ)       /* a gap of over 3 ticks: the tick held up (300 us at 10 kHz) */
+@@ -134,7 +142,7 @@ static volatile uint32_t fm1_ms;  /* milliseconds since boot (TIMER4-based, TIME
+ #define FM1B_UAC_CH 2             /* the USB audio input's channels: the master, and the app's on 3..N (plat_usb_ch) */
+ #endif
+ #define FELUCCA_UAC_CH FM1B_UAC_CH
+-#if FM1B_UAC_CH > 2
++#if FM1B_UAC_CH > 2 && !defined(FELUCCA_UAC_STALL_POLLS)
+ #define FELUCCA_UAC_STALL_POLLS 200u     /* the stream serviced every 10 kHz tick (main_fm1.c): 20 ms of polls */
+ #endif
+ #ifndef FM1B_UAC_DEEP
 diff --git a/firmware.json b/firmware.json
 index 60f0099..c27dc14 100644
 --- a/firmware.json
