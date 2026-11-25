@@ -14,6 +14,11 @@ These builds are not made or supported by the authors: problems with a build go 
 **Authors:** if you'd rather yours weren't here, or you'd like Big Screen in your own release, open an issue or write
 through [aikellogg.com](https://aikellogg.com) and it's done. Charles Vestal's firmwares are never built here.
 
+**Firmware authors:** the best-practice guide for FM-1 Big Screen, and a free fix for yours:
+**[aikellogg.com › Fix your firmware](https://aikellogg.com/#/fix-your-firmware)**
+([video](https://youtu.be/En7lYeFrhkk)). These builds follow The Firmware Hub every night at midnight (new and updated
+firmwares built again; a firmware that has Big Screen in its own release is never built here: its own file is the download).
+
 **Before installing:** back up your FM-1 with [M-Flasher](https://github.com/jvitkauskas/m-flasher) (it saves
 everything and puts it all back). These are untested on most units: install at your own risk. Melodee's build has a
 resources file too: install the `.fwsc`, then send `-res.bin` with Melodee's own `tools/fm1_resources.py`.
