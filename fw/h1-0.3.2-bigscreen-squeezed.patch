@@ -1,0 +1,50 @@
+diff --git a/app/app.h b/app/app.h
+index 2b39943..6c36340 100644
+--- a/app/app.h
++++ b/app/app.h
+@@ -1,3 +1,11 @@
++/* FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's mirror turned on (fm1.toml mirror = true), its
++ * buffers smaller so it fits: the send ring and the row segments (device/mirror.c) */
++#ifndef MRQ
++#define MRQ 1536u
++#endif
++#ifndef MR_SEGW
++#define MR_SEGW 240u
++#endif
+ /* h1 on the FM-1: the app's half of fm1-base's contract (device/unity.c includes this, then app.c). */
+ #pragma once
+ #include <stdint.h>
+diff --git a/app/fm1.toml b/app/fm1.toml
+index 417d976..e9fafdc 100644
+--- a/app/fm1.toml
++++ b/app/fm1.toml
+@@ -1,5 +1,7 @@
+ # h1's build settings for fm1-base's tools/build.py (../build.sh runs it; the keys are explained at its top)
+ name = "h1"                    # names the build's files: app/build/h1.fwsc, h1-X.Y.Z.fwsc
++usb_console = false                # FM-1 Big Screen squeeze: room for the mirror
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ id_prefix = "FM-1_481"         # h1's own package identity: dev builds FM-1_48100, releases FM-1_481XXYYZZ
+ usb_manufacturer = "h1"
+ usb_product = "h1 FM-1"
+@@ -28,7 +30,7 @@ font_trim = true
+ font_pack = true
+ # what a crash leaves behind is kept in flash (read with base/tools/fm1_remote.py crashes), with each stack's
+ # room at the crash; the stacks are painted at every start, so their unused bytes can be read (app.c's PERF)
+-crash_history = true
++crash_history = false                # FM-1 Big Screen squeeze: room for the mirror
+ # USB audio: the FM-1 is a USB audio input beside its USB MIDI (one composite device), so a computer or a phone
+ # records it straight off the cable: the sound at MASTER. Nothing played back through it (usb_audio_out).
+ usb_audio_in = true
+diff --git a/firmware.json b/firmware.json
+index 60f0099..c27dc14 100644
+--- a/firmware.json
++++ b/firmware.json
+@@ -14,7 +14,7 @@
+   "hardware": {
+     "models": ["FM-1"],
+     "flash": ["856014", "B36014"],
+-    "features": ["usb-audio-in", "usb-midi-host", "second-core", "screen-reader"]
++    "features": ["usb-audio-in", "usb-midi-host", "second-core", "screen-reader", "screen-mirror"]
+   },
+   "credits": "h1 is built on fm1-base by Charles Vestal and felucca-bsp, which come from Felucca by Leo Kuroshita, Hügelton Instruments."
+ }
