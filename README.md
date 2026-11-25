@@ -7,7 +7,7 @@ author's own firmware, built from their published source with a small addition, 
 **Big Knobs** and **Key Lights** where the firmware allows. Pick one and see what it looks like at
 **[aikellogg.com › Big Screen FWs](https://aikellogg.com/#/make-big-screen)**.
 
-**173 builds.** Every firmware here belongs to its author and keeps its own license; the credit, the license and the
+**172 builds.** Every firmware here belongs to its author and keeps its own license; the credit, the license and the
 exact source (repository and commit) are in the table, and each build's `.patch` is the complete set of changes.
 These builds are not made or supported by the authors: problems with a build go to
 [this repository's issues](https://github.com/pfkellogg/fm1-big-screen-builds/issues), not to them.
@@ -63,7 +63,6 @@ resources file too: install the `.fwsc`, then send `-res.bin` with Melodee's own
 | DAYV-X 0.1.1 | Repoman | GPL-3.0 | [halfman73/dayv-x](https://github.com/halfman73/dayv-x/tree/56bb746c3f0a46d155fe0b624d7cb2c4dfda1666) | [dayvx-0.1.1-bigscreen.fwsc](fw/dayvx-0.1.1-bigscreen.fwsc) · [patch](fw/dayvx-0.1.1-bigscreen.patch) | FM-1 Big Screen code added |
 | Del Rio 1.0.1 | Jess Del Rio | MPL-2.0 | [jsopdebeeck/fm1-delrio](https://github.com/jsopdebeeck/fm1-delrio/tree/dcfeff1fec695ed13ff63f50863927618f867dea) | [delrio-1.0.1-bigscreen.fwsc](fw/delrio-1.0.1-bigscreen.fwsc) · [patch](fw/delrio-1.0.1-bigscreen.patch) | Charles Vestal's fm1-base mirror, turned on |
 | DFD ACID ENGINE 1-v1.8.2-da1-r7 | Polaris Sound Lab | GPL-3.0 | [drophlex/DFD-ACID-ENGINE](https://github.com/drophlex/DFD-ACID-ENGINE/tree/fd315ceec4744aa1bfa577e51357117cf1d6feab) | [dfdacidengine-1-v1.8.2-da1-r7-bigscreen.fwsc](fw/dfdacidengine-1-v1.8.2-da1-r7-bigscreen.fwsc) · [patch](fw/dfdacidengine-1-v1.8.2-da1-r7-bigscreen.patch) | FM-1 Big Screen code added |
-| Dinghy 0.5 | zvenson | GPL-3.0 | [zvenson/dinghy](https://github.com/zvenson/dinghy/tree/ea1b6bf5973b11f9b4b806d08155602aaa0b505e) | [dinghy-0.5-bigscreen.fwsc](fw/dinghy-0.5-bigscreen.fwsc) · [patch](fw/dinghy-0.5-bigscreen.patch) | FM-1 Big Screen code added |
 | DRIFT 0.9.6 | FBNFRTG | GPL-3.0 | [FBNFRTG/drift-fm1](https://github.com/FBNFRTG/drift-fm1/tree/08b65e1233fea6b542f9f22629ad6c1d761c7667) | [drift-0.9.6-bigscreen.fwsc](fw/drift-0.9.6-bigscreen.fwsc) · [patch](fw/drift-0.9.6-bigscreen.patch) | FM-1 Big Screen code added |
 | Drumlab 1.0.0-graduationday | pbarilla | GPL-3.0 | [pbarilla/drumlab](https://github.com/pbarilla/drumlab/tree/f8c86cce1cc82a93b1dc763f9d1b2f8068e8f62f) | [drumlab-1.0.0-graduationday-bigscreen.fwsc](fw/drumlab-1.0.0-graduationday-bigscreen.fwsc) · [patch](fw/drumlab-1.0.0-graduationday-bigscreen.patch) | FM-1 Big Screen code added |
 | Drumtonic 0.9.6 | Federico Ciapi | GPL-3.0 | [fc79/drumtonic](https://github.com/fc79/drumtonic/tree/faff70b6ddb8e93e6ae6aa6a38990541264f1ca1) | [drumtonic-0.9.6-bigscreen.fwsc](fw/drumtonic-0.9.6-bigscreen.fwsc) · [patch](fw/drumtonic-0.9.6-bigscreen.patch) | FM-1 Big Screen code added |
