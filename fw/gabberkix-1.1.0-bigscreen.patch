@@ -1,0 +1,24 @@
+diff --git a/app/fm1.toml b/app/fm1.toml
+index d02dfb9..9112cee 100644
+--- a/app/fm1.toml
++++ b/app/fm1.toml
+@@ -1,5 +1,6 @@
+ # GABBERKIX's build settings (fm1-base's tools/build.py, through ./build.sh)
+ name = "GABBERKIX"             # APP_NAME is in app.h; this names the build's files: gabberkix.fwsc, gabberkix-X.Y.fwsc
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ id_prefix = "FM-1_818"         # package identity: dev FM-1_81800, releases FM-1_818XXYYZZ (1.0.0: FM-1_818010000).
+                                # Free in the hub's catalogue (2026-11-23); claim FM-1_818\d{6} when submitting
+ usb_manufacturer = "GABBERKIX"
+diff --git a/firmware.json b/firmware.json
+index 9e2b4ea..d431e31 100644
+--- a/firmware.json
++++ b/firmware.json
+@@ -14,7 +14,7 @@
+   "hardware": {
+     "models": ["FM-1"],
+     "flash": ["856014", "B36014"],
+-    "features": ["bluetooth-midi", "bluetooth-midi-devices", "usb-audio-in", "usb-audio-out", "usb-midi-host", "screen-reader", "backup"]
++    "features": ["bluetooth-midi", "bluetooth-midi-devices", "usb-audio-in", "usb-audio-out", "usb-midi-host", "screen-reader", "screen-mirror", "backup"]
+   },
+   "credits": "Built on fm1-base and felucca-bsp, from Felucca by Leo Kuroshita (Hügelton Instruments)."
+ }
