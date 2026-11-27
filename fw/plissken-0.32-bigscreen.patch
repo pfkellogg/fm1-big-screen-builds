@@ -1,0 +1,11 @@
+diff --git a/fm1.toml b/fm1.toml
+index 1063e65..b7a1480 100644
+--- a/fm1.toml
++++ b/fm1.toml
+@@ -1,5 +1,6 @@
+ # The template's build settings (tools/build.py)
+ name = "plissken"
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ id_prefix = "FM-1_1981"
+ usb_manufacturer = "Plissken"
+ usb_product = "Plissken FM-1"

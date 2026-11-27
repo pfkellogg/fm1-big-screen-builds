@@ -1,0 +1,11 @@
+diff --git a/fm1.toml b/fm1.toml
+index 79e2bda..cbcf1cd 100644
+--- a/fm1.toml
++++ b/fm1.toml
+@@ -1,5 +1,6 @@
+ # GRAIN PIANO build settings (fm1-base tools/build.py)
+ name = "grainpiano"             # the build's file names: grainpiano-1.0.fwsc, build/host/grainpiano_host
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ title = "GRAIN PIANO"           # the name people see (firmware hubs)
+ id_prefix = "FM-1_572"          # package identity: dev FM-1_57200, releases FM-1_572 + XXYYZZ (CHORD RUN is 571)
+ usb_manufacturer = "swtdr34mz"
