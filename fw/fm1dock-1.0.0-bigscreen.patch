@@ -15,6 +15,31 @@ index 5fa0084..5297b94 100644
      for (r = 1; r < 5u; r++)
          if (FM1_KEYMAP[r][p] >= 0)
              fm1__key((uint32_t)FM1_KEYMAP[r][p], (raw >> r) & 1u);
+diff --git a/firmware/src/dock.c b/firmware/src/dock.c
+index 617fdd2..2dbfaf1 100644
+--- a/firmware/src/dock.c
++++ b/firmware/src/dock.c
+@@ -3401,6 +3401,12 @@ static void app_main(void)
+             lcd_fill(0, 0, 240, 240, C_BLACK);
+         }
+ 
++#if FM1_BIG_SCREEN
++        if (fm1bs_full_req) {                   /* FM-1 Big Screen: a new viewer: everything drawn again */
++            fm1bs_full_req = 0;
++            full = 1;
++        }
++#endif
+         b = fm1_input_edges(&rel);              /* buttons pressed / released since the last call */
+         if (b)
+             save_note_armed = 1;                /* (a failed save after it is said again) */
+@@ -3602,3 +3608,7 @@ static void app_main(void)
+             store_flush();                      /* (interrupts are off while the flash is busy: no module code runs) */
+     }
+ }
++#if FM1_BIG_SCREEN
++/* FM-1 Big Screen: the synth playing (and its sound), as the sound's name to the app (Rich follows it) */
++static const char *fm1bs_sound_name(void) { return cur < n_mods ? mods[cur].name : FM1BS_NAME; }
++#endif
 diff --git a/firmware/src/lcd.c b/firmware/src/lcd.c
 index 7e40586..a11b3f1 100644
 --- a/firmware/src/lcd.c
@@ -94,10 +119,10 @@ index 7e40586..a11b3f1 100644
  #if BOARD_SMK37
  /* SMK-37 ST7789V 240x240: the stock v016 table (fm1-to-smk37 docs/01 3) with a SWRESET in front (stock
 diff --git a/firmware/src/platform.c b/firmware/src/platform.c
-index 9128691..68833d3 100644
+index 9128691..c0bbdc3 100644
 --- a/firmware/src/platform.c
 +++ b/firmware/src/platform.c
-@@ -28,6 +28,26 @@
+@@ -28,6 +28,29 @@
  enum { BTN_OCT_DOWN = 0, BTN_OCT_UP = 1, BTN_FX = 2, BTN_SEL = 3, BTN_ENV = 4, BTN_LFO = 5, BTN_EDIT = 6,
         BTN_GLO = 7, BTN_HOME = 8, BTN_SAVE = 9, BTN_ARP = 10, BTN_SEQ = 11, BTN_PLAY = 12, BTN_REC = 13 };
  enum { ENC_SELECT = 0, ENC_ALGORITHM = 1, ENC_KNOB1 = 2, ENC_KNOB2 = 3, ENC_KNOB3 = 4, ENC_KNOB4 = 5, ENC_PRESETS = 6 };
@@ -120,11 +145,14 @@ index 9128691..68833d3 100644
 +static void fm1bs_service(void);   /* fm1bs_mirror.c */
 +static void fm1bs_redraw(void);   /* the whole screen again: at the end of this file */
 +static int32_t fm1bs_master = -1, fm1bs_master_pot = -1;   /* Big Knobs' MASTER (fm1bs_panel.c) */
++static volatile uint8_t fm1bs_full_req;   /* fm1-dock: dock.c redraws everything */
++static const char *fm1bs_sound_name(void);   /* fm1-dock: the synth playing (end of dock.c) */
++#define FM1BS_SOUND fm1bs_sound_name()
 +#endif
  #define KEY_LED(k) (14u + (k))
  
  #ifdef DINGHY_HOST
-@@ -49,6 +69,23 @@ enum { ENC_SELECT = 0, ENC_ALGORITHM = 1, ENC_KNOB1 = 2, ENC_KNOB2 = 3, ENC_KNOB
+@@ -49,6 +72,23 @@ enum { ENC_SELECT = 0, ENC_ALGORITHM = 1, ENC_KNOB1 = 2, ENC_KNOB2 = 3, ENC_KNOB
  #include "fm1_audio.h"
  #if !BOARD_SMK37
  #include "fm1_adc.h"
@@ -148,7 +176,7 @@ index 9128691..68833d3 100644
  #endif
  #include "bootguard.h"
  
-@@ -314,6 +351,9 @@ extern void isr_alnk0(void);
+@@ -314,6 +354,9 @@ extern void isr_alnk0(void);
  #ifdef APP_SYSEX
  static int APP_SYSEX(const uint8_t *p, uint32_t n);
  #endif
@@ -158,7 +186,7 @@ index 9128691..68833d3 100644
  static void platform_poll(void)
  {
      static int32_t knob_avg = 512 * 16;
-@@ -329,6 +369,9 @@ static void platform_poll(void)
+@@ -329,6 +372,9 @@ static void platform_poll(void)
      }
  #endif
      ota_service();
@@ -168,12 +196,12 @@ index 9128691..68833d3 100644
      if (usb.ota_req) {
          usb.ota_req = 0;
          if (flash_ok)
-@@ -442,3 +485,6 @@ void fm1_cstart(void)
+@@ -442,3 +488,6 @@ void fm1_cstart(void)
          platform_poll();
  }
  #endif
 +#if FM1_BIG_SCREEN
-+static void fm1bs_redraw(void) { (void)0; }   /* FM-1 Big Screen: a new viewer gets the whole screen */
++static void fm1bs_redraw(void) { fm1bs_full_req = 1; }   /* FM-1 Big Screen: a new viewer gets the whole screen */
 +#endif
 diff --git a/firmware/src/recovery.c b/firmware/src/recovery.c
 index 41e4a05..c47e75d 100644
