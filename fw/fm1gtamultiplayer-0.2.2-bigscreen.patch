@@ -1,0 +1,49 @@
+diff --git a/app/fm1.toml b/app/fm1.toml
+index 578220b..e32e394 100644
+--- a/app/fm1.toml
++++ b/app/fm1.toml
+@@ -1,6 +1,7 @@
+ # SPDX-License-Identifier: GPL-3.0-only
+ # FM1_GTA Multiplayer — Home Wi-Fi LAN + MODE JANK + Browser Relay Cross-Play
+ name = "FM1_GTA_multiplayer"
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ id_prefix = "FM-1_107"
+ usb_manufacturer = "mlwilki"
+ usb_product = "FM1_GTA Multiplayer"
+Submodule base contains modified content
+diff --git a/base/device/wifi_own.c b/base/device/wifi_own.c
+index 08ffd74..6f641cc 100644
+--- a/base/device/wifi_own.c
++++ b/base/device/wifi_own.c
+@@ -186,7 +186,8 @@ static void own_mac(uint8_t mac[6])              /* the station's address: the B
+ #else
+         int have_vm = flash_ok && st_read(0x0E9000u, vm, sizeof vm) == 0;   /* VM record 102, the SDK's VM's first */
+ #endif
+-        if (!wifi_sta_get_mac(have_vm ? vm : 0, m)) {
++        /* Prefer unique SPI flash UID over stock 0x0E9000 VM MAC (avoids multi-FM-1 DHCP collisions) */
++        {
+             const uint8_t *u = plat_chip_uid();
+             unsigned i = 1;
+             while (u && i < 16u && u[i] == u[0])
+@@ -195,6 +196,8 @@ static void own_mac(uint8_t mac[6])              /* the station's address: the B
+                 for (i = 0; i < 6u; i++)
+                     m[i] = (uint8_t)(u[i] ^ u[i + 6u] ^ (i < 4u ? u[i + 12u] : 0));
+                 m[0] = (uint8_t)((m[0] & 0xFCu) | 0x02u);
++            } else {
++                (void)wifi_sta_get_mac(have_vm ? vm : 0, m);
+             }
+         }
+         have = 1;
+diff --git a/firmware.json b/firmware.json
+index 0c6aefd..985f3e7 100644
+--- a/firmware.json
++++ b/firmware.json
+@@ -14,7 +14,7 @@
+   "hardware": {
+     "models": ["FM-1"],
+     "flash": ["856014", "B36014"],
+-    "features": ["bluetooth-midi", "wifi", "screen-reader"]
++    "features": ["bluetooth-midi", "wifi", "screen-reader", "screen-mirror"]
+   },
+   "credits": "Built on fm1-base (Charles Vestal) and felucca-bsp (Leo Kuroshita, Hügelton Instruments); ported from shaydex-codes/outonparole."
+ }

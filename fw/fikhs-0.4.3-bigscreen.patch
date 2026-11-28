@@ -1,0 +1,28 @@
+diff --git a/app.h b/app.h
+index 0547673..21ab27a 100644
+--- a/app.h
++++ b/app.h
+@@ -1,3 +1,11 @@
++/* FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's mirror turned on (fm1.toml mirror = true), its
++ * buffers smaller so it fits: the send ring and the row segments (device/mirror.c) */
++#ifndef MRQ
++#define MRQ 1536u
++#endif
++#ifndef MR_SEGW
++#define MR_SEGW 240u
++#endif
+ /* SPDX-License-Identifier: MPL-2.0
+  * Copyright (C) 2026 swtdr34mz (FIKH-S) */
+ /* FIKH-S by swtdr34mz: ein experimenteller Drone-, Bass- und Textur-Synth für das M-VAVE FM-1 (auf fm1-base) nach dem
+diff --git a/fm1.toml b/fm1.toml
+index e4d60c6..5036f71 100644
+--- a/fm1.toml
++++ b/fm1.toml
+@@ -2,6 +2,7 @@
+ # the environment (the workflow sets it; for a local build: X0X_FONTSET=terminus python3 fm1-base/tools/build.py . --host).
+ # The panel's engraved serif faces are FIKH-S's own (ui_serif.h, from tools/gen_serif.py).
+ name = "fikhs"                    # the build's file names: fikhs-0.1.fwsc, build/host/fikhs_host
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ title = "FIKH-S"                  # the name people see (firmware hubs)
+ id_prefix = "FM-1_593"            # package identity: dev FM-1_59300, releases FM-1_593 + XXYYZZ (BA-55 592)
+ usb_manufacturer = "swtdr34mz"

@@ -1,0 +1,525 @@
+diff --git a/firmware/hal/fm1_input.h b/firmware/hal/fm1_input.h
+index 6ae274b..108973d 100644
+--- a/firmware/hal/fm1_input.h
++++ b/firmware/hal/fm1_input.h
+@@ -213,7 +213,11 @@ static void fm1__key(uint32_t id, uint32_t closed)
+ 
+ static void fm1__keys(uint32_t p)                  /* the keys of column p, just read */
+ {
+-    uint32_t r, raw = fm1_in.raw[p];
++    uint32_t r, raw = fm1_in.raw[p]
++#ifdef FM1BS_HELD
++        | fm1bs_held_raw[p]   /* FM-1 Big Screen: the app's presses (fm1bs_mirror.c) */
++#endif
++        ;
+     for (r = 1; r < 5u; r++)
+         if (FM1_KEYMAP[r][p] >= 0)
+             fm1__key((uint32_t)FM1_KEYMAP[r][p], (raw >> r) & 1u);
+diff --git a/firmware/src/lcd.c b/firmware/src/lcd.c
+index c2fd0ad..a14e67e 100644
+--- a/firmware/src/lcd.c
++++ b/firmware/src/lcd.c
+@@ -69,6 +69,32 @@ static void lcd_window(uint32_t x0, uint32_t y0, uint32_t x1, uint32_t y1)
+ 
+ static uint16_t lcd_fillbuf[240];
+ 
++#if FM1_BIG_SCREEN
++static void fm1bs_lcd(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint16_t *px, uint32_t stride, uint16_t c);   /* fm1bs_mirror.c */
++#endif
++#if FM1_BIG_SCREEN
++static void lcd_fill_raw(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint16_t c)
++{
++    uint32_t i, n, k, sw;
++    sw = (uint16_t)((c >> 8) | (c << 8));
++    if (!w || !h || x >= 240u || y >= 240u)
++        return;
++    if (x + w > 240u)
++        w = 240u - x;
++    if (y + h > 240u)
++        h = 240u - y;
++    lcd_sync();
++    k = 240u / w * w;                       /* whole rows per transfer (narrow fills: one DMA) */
++    for (i = 0; i < k; i++)
++        lcd_fillbuf[i] = (uint16_t)sw;
++    lcd_window(x, y, x + w - 1u, y + h - 1u);
++    for (n = w * h; n; n -= k) {
++        if (k > n)
++            k = n;
++        lcd_data(lcd_fillbuf, k * 2u);
++    }
++}
++#else
+ static void lcd_fill(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint16_t c)
+ {
+     uint32_t i, n, k, sw;
+@@ -90,7 +116,25 @@ static void lcd_fill(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint16_t c)
+         lcd_data(lcd_fillbuf, k * 2u);
+     }
+ }
++#endif
++#if FM1_BIG_SCREEN
++static void lcd_fill(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint16_t c)
++{
++    fm1bs_lcd(x, y, w, h, 0, 0, c);       /* FM-1 Big Screen (fm1bs_mirror.c) */
++    lcd_fill_raw(x, y, w, h, c);
++}
++#endif
++
+ 
++#if FM1_BIG_SCREEN
++static void lcd_blit_raw(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint16_t *px)
++{
++    if (!w || !h)
++        return;
++    lcd_window(x, y, x + w - 1u, y + h - 1u);
++    lcd_data(px, w * h * 2u);
++}
++#else
+ static void lcd_blit(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint16_t *px)
+ {
+     if (!w || !h)
+@@ -98,6 +142,15 @@ static void lcd_blit(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint1
+     lcd_window(x, y, x + w - 1u, y + h - 1u);
+     lcd_data(px, w * h * 2u);
+ }
++#endif
++#if FM1_BIG_SCREEN
++static void lcd_blit(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint16_t *px)
++{
++    fm1bs_lcd(x, y, w, h, px, w, 0);       /* FM-1 Big Screen (fm1bs_mirror.c) */
++    lcd_blit_raw(x, y, w, h, px);
++}
++#endif
++
+ 
+ #if BOARD_SMK37
+ /* SMK-37 Pro ST7789V 240x240: the stock v016 table with a SWRESET in
+diff --git a/firmware/src/platform.c b/firmware/src/platform.c
+index 39bfc8a..bc19d0a 100644
+--- a/firmware/src/platform.c
++++ b/firmware/src/platform.c
+@@ -23,6 +23,26 @@
+  */
+ /* the panel by name: buttons (fm1_in.buttons, fm1_input_edges, fm1_led_key: bit / id), the encoders
+  * (fm1_enc_take); the 27 note keys are fm1_in.notes bit 0 (F3) .. 26 (G5), LED id 14 + key */
++/* FM-1 Big Screen (unofficial build, aikellogg.com): the screen over USB SysEx to FM-1 Big Screen */
++#include <stdint.h>
++#ifndef FM1_BIG_SCREEN
++#define FM1_BIG_SCREEN 1
++#endif
++#if FM1_BIG_SCREEN
++#ifndef SXQ
++#define SXQ 512u
++#endif
++#define FM1BS_MASTER 1
++#define FM1BS_GLOW(c) (fm1_led_dim[c])
++#include <stdint.h>
++#define FM1BS_HELD 1
++static volatile uint8_t fm1bs_held_raw[16];   /* the app's presses, per column (fm1bs_mirror.c) */
++#define FM1BS_BUFFER 6144u
++#define FM1BS_NAME "BLUES BOX 2.3.1"
++static void fm1bs_service(void);   /* fm1bs_mirror.c */
++static void fm1bs_redraw(void);   /* the whole screen again: at the end of this file */
++static int32_t fm1bs_master = -1, fm1bs_master_pot = -1;   /* Big Knobs' MASTER (fm1bs_panel.c) */
++#endif
+ #ifndef BOARD_SMK37
+ #define BOARD_SMK37 0                           /* 1: the M-Vave SMK-37 (tools/build.py --board smk37; hal/fm1_cc.h) */
+ #endif
+@@ -75,6 +95,23 @@ static void fm1_led_key_glow(uint32_t id, int on)   /* as fm1_led_key, the dim l
+ #include "fm1_audio.h"
+ #if !BOARD_SMK37
+ #include "fm1_adc.h"                            /* (SMK: smk_input.h stands in, MASTER = K1) */
++#if FM1_BIG_SCREEN
++/* Big Knobs: MASTER set from the app (fm1bs_mirror.c) until the real knob moves */
++static int32_t fm1bs_adc_read(uint32_t ch)
++{
++    int32_t v = fm1_adc_read(ch);
++    if (ch != FM1_ADC_MASTER || fm1bs_master < 0 || v < 0)
++        return v;
++    if (fm1bs_master_pot < 0)
++        fm1bs_master_pot = v;
++    else if (v > fm1bs_master_pot + 24 || v < fm1bs_master_pot - 24) {
++        fm1bs_master = -1;
++        return v;
++    }
++    return fm1bs_master;
++}
++#define fm1_adc_read fm1bs_adc_read
++#endif
+ #endif
+ #include "bootguard.h"
+ 
+@@ -392,6 +429,9 @@ void fm1_alnk0_irq(void)                       /* via isr_alnk0 (hal/fm1_isr.S)
+ extern void isr_alnk0(void);
+ 
+ /* ---- the main loop's duties: watchdog, USB, the installer's update request, the MASTER knob */
++#if FM1_BIG_SCREEN
++#include "fm1bs_mirror.c"           /* FM-1 Big Screen (MIT) */
++#endif
+ static void platform_poll(void)
+ {
+     static int32_t knob_avg = 512 * 16;
+@@ -399,6 +439,9 @@ static void platform_poll(void)
+     fm1_wdt_feed();
+     usb_retry(fm1_ms);
+     ota_service();
++#if FM1_BIG_SCREEN
++    fm1bs_service();                        /* FM-1 Big Screen (fm1bs_mirror.c) */
++#endif
+     if (usb.ota_req) {
+         usb.ota_req = 0;
+         if (flash_ok)
+@@ -494,3 +537,6 @@ void fm1_cstart(void)
+         platform_poll();
+ }
+ #endif
++#if FM1_BIG_SCREEN
++static void fm1bs_redraw(void) { (void)0; }   /* FM-1 Big Screen: a new viewer gets the whole screen */
++#endif
+diff --git a/firmware/src/recovery.c b/firmware/src/recovery.c
+index 8f7d068..ab6deaa 100644
+--- a/firmware/src/recovery.c
++++ b/firmware/src/recovery.c
+@@ -32,6 +32,9 @@ static void recovery_step(void)
+         return;
+     }
+     ota_service();
++#if FM1_BIG_SCREEN
++    fm1bs_service();                        /* FM-1 Big Screen (fm1bs_mirror.c) */
++#endif
+     if (usb.ota_req) {
+         usb.ota_req = 0;
+         if (flash_ok) ota_session();         /* same validated updater as normal mode */
+diff --git a/firmware/src/usb.c b/firmware/src/usb.c
+index c08b00c..f26a3b1 100644
+--- a/firmware/src/usb.c
++++ b/firmware/src/usb.c
+@@ -152,7 +152,9 @@ static uint8_t sx_frame[640];
+ static uint32_t sx_pos;
+ static volatile uint32_t sx_frame_len;
+ static volatile uint8_t sx_ready, sx_collect, sx_busy;
++#ifndef SXQ
+ #define SXQ 64u
++#endif
+ static uint32_t sx_out_q[SXQ];
+ static volatile uint32_t so_w, so_r;
+ #endif
+@@ -674,6 +676,9 @@ stall:
+ }
+ 
+ /* SysEx assembly: only short commands matter here */
++#if FM1_BIG_SCREEN
++int fm1bs_sysex(const uint8_t *m, unsigned n);   /* FM-1 Big Screen, Big Knobs (fm1bs_mirror.c) */
++#endif
+ static void sysex_byte(uint8_t b)
+ {
+     static const uint8_t UBOOT_KEY[6] = {0xF0, 0x22, 0x24, 0x35, 0x7D, 0xF7};
+@@ -712,6 +717,10 @@ static void sysex_byte(uint8_t b)
+             ok = usb.sysex[i] == UBOOT_KEY[i];
+         if (ok)
+             usb.uboot_req = 1;
++#if FM1_BIG_SCREEN
++        else if (usb.sx_len >= 6u && usb.sx_len <= 8u && usb.sysex[1] == 0x7D && usb.sysex[2] == 'F' && usb.sysex[3] == 'S')
++            fm1bs_sysex(usb.sysex, usb.sx_len);   /* FM-1 Big Screen hello, Big Knobs */
++#endif
+ #if FELUCCA_OTA
+         else if (usb.sx_len == 6u && usb.sysex[1] == 0x22 && usb.sysex[2] == 0x24 && usb.sysex[3] == 0x35 &&
+                  usb.sysex[4] == 0x7F)
+diff --git a/firmware/src/fm1bs_mirror.c b/firmware/src/fm1bs_mirror.c
+new file mode 100644
+index 0000000..d28844b
+--- /dev/null
++++ b/firmware/src/fm1bs_mirror.c
+@@ -0,0 +1,102 @@
++/* SPDX-License-Identifier: MIT
++ * Copyright (c) 2026 Patrick F. Kellogg
++ *
++ * FM-1 Big Screen, added to a Felucca-family firmware by aikellogg.com/#/make-big-screen (unofficial build).
++ * While an app asks (F0 7D 'F' 'S' 00/01 F7, about once a second), every rectangle sent to the LCD (lcd.c) also goes
++ * out over USB MIDI SysEx, so FM-1 Big Screen (github.com/pfkellogg/fm1-mirror) shows the screen big. screen_mirror.c
++ * makes the messages; this is the glue: the hello from usb.c sysex_byte, sending through usb.c's SysEx ring without
++ * ever waiting on it, and the main loop's poll. The firmware's name goes out as the sound's name. With nobody asking it
++ * does nothing. USB only.
++ *
++ * Big Knobs (host -> FM-1): F0 7D 'F' 'S' 04 e n F7 turns encoder e (0 SELECT, 1 ALGORITHM, 2..5 KNOB 1..4, 6 PRESETS)
++ *   n clicks (7-bit signed: 1..63 clockwise, 127..65 = -1..-63), as if turned by hand;
++ *   F0 7D 'F' 'S' 06 lo hi F7 sets MASTER (0..1023, lo + hi * 128) until the real knob moves.
++ * Remote panel (host -> FM-1): F0 7D 'F' 'S' 07 id down F7 presses (down 1) or lets go (0) button or key id (0..13 the
++ *   buttons, 14..40 the keys F3..G5: FM1_KEYMAP's ids), as a finger would: into the scan before its debounce, so holds
++ *   and combinations work. Everything held is let go when the app stops asking.
++ * Key Lights (FM-1 -> host): F0 7D 'F' 'S' 05 k0 k1 k2 k3 b0 b1 [g0 g1 g2 g3 h0 h1] F7, while an app asks: the lit
++ *   LEDs, keys (bit k = key k, F3 .. G5, 7 bits a byte, k0 first) and buttons (bit i = button id i, 0..13); then, where
++ *   the firmware has them (FM1BS_GLOW), the softer glows the same way (dim, breathing, mid-level LEDs that aren't fully
++ *   lit). When they change, at most every 20 ms, and once a second.
++ */
++#ifndef FM1BS_SOUND
++#define FM1BS_SOUND FM1BS_NAME                   /* a firmware with no sound name for us: its own name */
++#endif
++#ifndef FM1BS_BUFFER
++#define FM1BS_BUFFER 6144u
++#endif
++#define SM_BUFFER FM1BS_BUFFER
++#include "screen_mirror.c"
++
++static uint16_t fm1bs_row[240];                 /* one row, back in RGB565 order (the LCD's buffers are byte-swapped) */
++static uint8_t fm1bs_lost;                      /* rows dropped: the whole screen again when there's room */
++static uint32_t fm1bs_full_at;                  /* the last whole-screen redraw asked for (at most twice a second) */
++
++/* One SysEx message into usb.c's ring, or -2 (busy) when it has no room for all of it: never waits */
++static int fm1bs_wire_send(const uint8_t *m, unsigned n)
++{
++    if (!usb.config)
++        return -1;
++    if (SXQ - (so_w - so_r) < (n + 2u) / 3u + 1u)
++        return -2;
++    return ota_wire_send(m, n) ? -1 : 0;
++}
++
++/* lcd.c: a rectangle about to go to the LCD; px (byte-swapped, stride pixels a row) or, for a fill, NULL and the
++ * colour c */
++static void fm1bs_lcd(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint16_t *px, uint32_t stride, uint16_t c)
++{
++    uint32_t r, i, start = fm1_ms;
++    if (!sm_on() || fm1bs_lost || x >= 240u || y >= 240u)
++        return;
++    if (x + w > 240u)
++        w = 240u - x;
++    if (y + h > 240u)
++        h = 240u - y;
++    for (r = 0; r < h; r++) {
++        uint32_t t0 = fm1_ms;
++        if (fm1_ms - start > 400u) {                   /* the host isn't keeping up: never hold the screen longer */
++            fm1bs_lost = 1;
++            return;
++        }
++        for (i = 0; i < w; i++)
++            fm1bs_row[i] = px ? (uint16_t)((px[r * stride + i] >> 8) | (px[r * stride + i] << 8)) : c;
++        while (!sm_rows(fm1bs_row, x, y + r, w, 1)) {   /* full: send some, briefly; else the whole screen later */
++            sm_poll(fm1_ms, fm1bs_wire_send);
++            if (fm1_ms - t0 > 60u) {
++                fm1bs_lost = 1;
++                return;
++            }
++        }
++    }
++}
++
++#define FM1BS_SEND fm1bs_wire_send
++#define FM1BS_LISTENING sm_name_live
++#include "fm1bs_panel.c"                         /* Big Knobs, Key Lights, the remote presses */
++
++int fm1bs_sysex(const uint8_t *m, unsigned n)
++{
++    if (fm1bs_panel_sysex(m, n))
++        return 1;
++    return sm_sysex(m, n);
++}
++
++/* main loop: send what's queued; a new viewer (or rows dropped) gets the whole screen redrawn */
++static void fm1bs_service(void)
++{
++    static uint32_t named_at;
++    sm_poll(fm1_ms, fm1bs_wire_send);
++    if (fm1_ms - named_at >= 100u) {
++        named_at = fm1_ms;
++#ifndef FM1BS_NO_NAME
++        sm_name(FM1BS_SOUND, fm1_ms, fm1bs_wire_send);   /* the sound playing (or the firmware's name) */
++#endif
++    }
++    fm1bs_panel_service();
++    if (sm_take_full_request() || (fm1bs_lost && sm_on() && fm1_ms - fm1bs_full_at >= 500u)) {
++        fm1bs_lost = 0;
++        fm1bs_full_at = fm1_ms;
++        fm1bs_redraw();
++    }
++}
+diff --git a/firmware/src/screen_mirror.c b/firmware/src/screen_mirror.c
+new file mode 100644
+index 0000000..c511b99
+--- /dev/null
++++ b/firmware/src/screen_mirror.c
+@@ -0,0 +1,137 @@
++/* SPDX-License-Identifier: MIT
++ * Copyright (c) 2026 Patrick F. Kellogg
++ *
++ * FM-1 screen mirror, firmware-neutral version of the "Screen mirror" section
++ * in app/screen.c of the screen-out branch. Messages (see README.md):
++ *   in:  F0 7D 'F' 'S' 00 F7  (01: and send the whole screen again; 02: only the sound's name, no screen)
++ *   out: F0 7D 'F' 'S' 01 row_lo row_hi col_lo col_hi {count c0-6 c7-13 c14-15}... F7
++ *        F0 7D 'F' 'S' 02 name... F7  (the sound playing, in ASCII: sm_name; after each hello and when it changes)
++ * Each message is at most SM_MESSAGE bytes, so it shares a small USB queue with notes.
++ */
++#include "screen_mirror.h"
++
++#ifndef SM_BUFFER
++#define SM_BUFFER 16384u /* queued messages, each with a length byte in front */
++#endif
++#define SM_MESSAGE 70u
++#define SM_TIMEOUT 3000u
++
++/* (sm_ prefixed: a firmware built as one compilation unit, like ChoralRoot, may have its own "buffer", "length"...) */
++#ifndef SM_SECTION
++#define SM_SECTION /* a firmware short of RAM can place the buffer elsewhere (its .pool: Melodee's, as its first Big Screen) */
++#endif
++static uint8_t sm_buffer[SM_BUFFER] SM_SECTION;
++static unsigned sm_length, sm_sent, sm_live, sm_hello, sm_full;
++static uint32_t sm_heard;
++static unsigned sm_name_hello, sm_name_live, sm_name_due;
++static uint32_t sm_name_heard;
++static char sm_name_last[48];
++
++int sm_sysex(const uint8_t *m, unsigned n)
++{
++    if (n != 6 || m[0] != 0xf0 || m[1] != 0x7d || m[2] != 'F' || m[3] != 'S' || m[5] != 0xf7)
++        return 0;
++    sm_name_hello = 1;                 /* every hello also asks for the sound's name */
++    if (m[4] != 2)
++        sm_hello = 1u + (m[4] == 1);
++    return 1;
++}
++
++int sm_on(void) { return sm_live || sm_hello; }
++
++int sm_take_full_request(void)
++{
++    unsigned f = sm_full;
++    sm_full = 0;
++    return (int)f;
++}
++
++int sm_rows(const uint16_t *px, unsigned left, unsigned top, unsigned width, unsigned rows)
++{
++    unsigned before = sm_length;
++    for (unsigned row = 0; row < rows; ++row, px += width)
++        for (unsigned i = 0; i < width;) {
++            if (sm_length + 1u + SM_MESSAGE > SM_BUFFER) { /* room for a whole message, or wait */
++                if (!before) return 1; /* bigger than the whole buffer: sent as far as it fits */
++                sm_length = before;
++                return 0;
++            }
++            uint8_t *out = sm_buffer + sm_length;
++            unsigned y = top + row, x = left + i, k = 10;
++            out[1] = 0xf0; out[2] = 0x7d; out[3] = 'F'; out[4] = 'S'; out[5] = 1;
++            out[6] = (uint8_t)(y & 127u); out[7] = (uint8_t)(y >> 7);
++            out[8] = (uint8_t)(x & 127u); out[9] = (uint8_t)(x >> 7);
++            for (; i < width && k + 5u <= SM_MESSAGE; k += 4) {
++                unsigned run = 1, c = px[i];
++                while (i + run < width && run < 127 && px[i + run] == c) ++run;
++                out[k] = (uint8_t)run;
++                out[k + 1] = (uint8_t)(c & 127u);
++                out[k + 2] = (uint8_t)((c >> 7) & 127u);
++                out[k + 3] = (uint8_t)(c >> 14);
++                i += run;
++            }
++            out[k] = 0xf7;
++            out[0] = (uint8_t)k;
++            sm_length += 1u + k;
++        }
++    return 1;
++}
++
++void sm_poll(uint32_t now, sm_send_fn send)
++{
++    if (sm_hello) {
++        sm_heard = now;
++        if (!sm_live || sm_hello > 1) sm_full = 1;
++        sm_hello = 0;
++        sm_live = 1;
++    }
++    if (now - sm_heard >= SM_TIMEOUT) sm_live = 0;
++    while (sm_live && sm_sent < sm_length) {
++        int r = send(sm_buffer + sm_sent + 1, sm_buffer[sm_sent]);
++        if (r == -2) break; /* busy: the rest next time */
++        if (r) sm_live = 0;
++        sm_sent += 1u + sm_buffer[sm_sent];
++    }
++    if (!sm_live || sm_sent >= sm_length) {
++        sm_length = sm_sent = 0;
++    } else if (sm_sent) {
++        /* Move what's left to the front, so the room it freed takes new rows now (with a small buffer, waiting for
++         * all of it to go first held the screen up too long). Forward copy: the data only moves down. */
++        unsigned i, n = sm_length - sm_sent;
++        for (i = 0; i < n; i++)
++            sm_buffer[i] = sm_buffer[sm_sent + i];
++        sm_length = n;
++        sm_sent = 0;
++    }
++}
++
++void sm_name(const char *name, uint32_t now, sm_send_fn send)
++{
++    uint8_t m[6 + 48];
++    unsigned i, n = 5, same = 1;
++    if (sm_name_hello) {               /* a hello (of either kind): send the name now, and keep it fresh 3 s */
++        sm_name_hello = 0;
++        sm_name_heard = now;
++        sm_name_live = 1;
++        sm_name_due = 1;
++    }
++    if (now - sm_name_heard >= SM_TIMEOUT) sm_name_live = 0;
++    if (!sm_name_live) return;
++    for (i = 0; i < sizeof sm_name_last - 1u && name[i]; ++i)
++        if (sm_name_last[i] != name[i]) same = 0;
++    if (sm_name_last[i]) same = 0;
++    if (!same) {
++        for (i = 0; i < sizeof sm_name_last - 1u && name[i]; ++i) sm_name_last[i] = name[i];
++        sm_name_last[i] = 0;
++        sm_name_due = 1;
++    }
++    if (!sm_name_due) return;
++    m[0] = 0xf0; m[1] = 0x7d; m[2] = 'F'; m[3] = 'S'; m[4] = 2;
++    for (i = 0; sm_name_last[i]; ++i) {
++        uint8_t c = (uint8_t)sm_name_last[i];
++        m[n++] = c < 0x20 || c > 0x7e ? (uint8_t)' ' : c;   /* 7-bit only (the header's middle dot: a space) */
++    }
++    m[n++] = 0xf7;
++    i = (unsigned)send(m, n);
++    if ((int)i == 0) sm_name_due = 0;  /* busy (-2) or not sent: again next time */
++}
+diff --git a/firmware/src/screen_mirror.h b/firmware/src/screen_mirror.h
+new file mode 100644
+index 0000000..06d9113
+--- /dev/null
++++ b/firmware/src/screen_mirror.h
+@@ -0,0 +1,41 @@
++/* SPDX-License-Identifier: MIT
++ * Copyright (c) 2026 Patrick F. Kellogg
++ *
++ * FM-1 screen mirror: sends the screen over USB MIDI SysEx to FM-1 Mirror
++ * (github.com/pfkellogg/fm1-mirror) or any app that speaks the same messages.
++ * Firmware-neutral: it needs only the rows you send to the LCD, a millisecond
++ * clock and a way to send one SysEx message. See README.md.
++ */
++#ifndef SCREEN_MIRROR_H
++#define SCREEN_MIRROR_H
++#include <stdint.h>
++
++/* Sends one complete SysEx message (F0 ... F7). Return 0 when sent, -2 when
++ * the output is busy (try the same message again later), anything else to
++ * stop mirroring. */
++typedef int (*sm_send_fn)(const uint8_t *message, unsigned length);
++
++/* Call for every incoming SysEx message; returns 1 if it was a mirror hello
++ * (F0 7D 'F' 'S' 00/01/02 F7; 02 asks only for the sound's name), which the caller can then ignore. */
++int sm_sysex(const uint8_t *m, unsigned n);
++
++/* 1 while an app is asking: only then is sm_rows worth calling. */
++int sm_on(void);
++
++/* 1 once when the app wants the whole screen (a new viewer): repaint everything. */
++int sm_take_full_request(void);
++
++/* Queue `rows` rows of RGB565 pixels, `width` wide, whose top-left is (left, top).
++ * Returns 0 when the buffer has no room yet: call again with the same rows after
++ * sm_poll has sent some (or skip, and repaint those rows later). */
++int sm_rows(const uint16_t *pixels, unsigned left, unsigned top, unsigned width, unsigned rows);
++
++/* Call often (e.g. every main-loop pass) with the time in milliseconds: sends what's
++ * queued, and stops mirroring 3 s after the last hello. */
++void sm_poll(uint32_t now_ms, sm_send_fn send);
++
++/* Call often with the sound playing now ("T1 FM6 ICE BELL", ASCII, up to 47 characters): while an app asks (any
++ * hello in the last 3 s), sends it as F0 7D 'F' 'S' 02 name... F7 after each hello and whenever it changes. */
++void sm_name(const char *name, uint32_t now_ms, sm_send_fn send);
++
++#endif

@@ -1,0 +1,12 @@
+diff --git a/fm1.toml b/fm1.toml
+index 7f2de3c..4db41b8 100644
+--- a/fm1.toml
++++ b/fm1.toml
+@@ -2,6 +2,7 @@
+ # the environment (the workflow sets it; for a local build: X0X_FONTSET=terminus python3 fm1-base/tools/build.py . --host).
+ # The engraved serif faces are GARGOYLE's own (ui_serif.h, from tools/gen_serif.py).
+ name = "gargoyle"                 # the build's file names: gargoyle-0.1.fwsc, build/host/gargoyle_host
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ title = "GARGOYLE"                # the name people see (firmware hubs)
+ id_prefix = "FM-1_594"            # package identity: dev FM-1_59400, releases FM-1_594 + XXYYZZ (FIKH-S 593, BA-55 592)
+ usb_manufacturer = "swtdr34mz"

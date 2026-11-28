@@ -1,0 +1,12 @@
+diff --git a/fm1.toml b/fm1.toml
+index 08acf18..3362293 100644
+--- a/fm1.toml
++++ b/fm1.toml
+@@ -1,6 +1,7 @@
+ # PROBLEM 6 build settings (fm1-base tools/build.py). The pixel type of the screens: X0X_FONTSET=terminus in the
+ # environment (the workflow sets it; for a local build: X0X_FONTSET=terminus python3 fm1-base/tools/build.py . --host)
+ name = "problem6"                # the build's file names: problem6-0.1.fwsc, build/host/problem6_host
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ title = "PROBLEM 6"              # the name people see (firmware hubs)
+ id_prefix = "FM-1_580"            # package identity: dev FM-1_58000, releases FM-1_580 + XXYYZZ (COLLAPSE 579)
+ usb_manufacturer = "swtdr34mz"

@@ -1,0 +1,25 @@
+diff --git a/app/fm1.toml b/app/fm1.toml
+index 02bda7c..5d84de9 100644
+--- a/app/fm1.toml
++++ b/app/fm1.toml
+@@ -1,6 +1,7 @@
+ # After Images: a generative synth for the M-VAVE FM-1 (tools/build.py)
+ # Build: ./build.sh (from the repository's root; it runs base/tools/build.py app with the Terminus pixel font)
+ name = "AFTER-IMAGES"
++mirror = true                  # FM-1 Big Screen (unofficial build, aikellogg.com): fm1-base's screen, lights and remote
+ title = "After Images"
+ id_prefix = "FM-1_78"          # package identity: dev FM-1_7800, releases FM-1_78XXYYZZ
+ usb_manufacturer = "After Images"
+diff --git a/firmware.json b/firmware.json
+index 95ce988..cec18dd 100644
+--- a/firmware.json
++++ b/firmware.json
+@@ -13,7 +13,7 @@
+   "hardware": {
+     "models": ["FM-1"],
+     "flash": ["856014", "B36014"],
+-    "features": ["usb-audio-in", "second-core", "velocity", "pressure", "screen-reader"]
++    "features": ["usb-audio-in", "second-core", "velocity", "pressure", "screen-reader", "screen-mirror"]
+   },
+   "credits": "Built on fm1-base by Charles Vestal and felucca-bsp by Leo Kuroshita."
+ }
